@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.1.0</title>
+    <title>Hully Gully WebXR Simulator v3.3.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.1.0
+                v3.3.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Performance Ottimizzate & Tasto X Aggancio</p>
+        <p class="text-xs text-slate-500 mb-4">Nuova Mappatura: X/Y Scala, A Aggancio, B Carrozza</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -81,10 +81,10 @@
             <p><strong>Mappatura VR:</strong></p>
             <p>• Stick SX (Oriz): VDISCO</p>
             <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
-            <p>• <strong>Tasto X (Sinistro): Aggancio / Sgancio Velocità</strong></p>
-            <p>• <strong>Tasto Y (Sinistro): Vista Carrozza (Direzione Moto)</strong></p>
-            <p>• Tasti A (-) e B (+): Scala del Mondo (Controller Destro)</p>
-            <p>• Grilletto DX: Teletrasporto sicuro sul pavimento</p>
+            <p>• <strong>Tasti X (-) e Y (+): Scala del Mondo (Sinistro)</strong></p>
+            <p>• <strong>Tasto A: Aggancio / Sgancio Velocità (Destro)</strong></p>
+            <p>• <strong>Tasto B: Vista Carrozza / Direzione Moto (Destro)</strong></p>
+            <p>• <strong>Grilletto DX: Teletrasporto sicuro</strong></p>
         </div>
     </div>
 
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.1.0";
+        const GAME_VERSION = "v3.3.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -110,9 +110,7 @@
         let animatedSpotLights = [];
         let raycaster = new THREE.Raycaster();
 
-        // Oggetti riutilizzabili per evitare allocazioni nel loop (GC Optimization)
-        const _tempVector = new THREE.Vector3();
-        const _tempQuaternion = new THREE.Quaternion();
+        // Oggetti riutilizzabili per GC optimization
         const _carWorldPos = new THREE.Vector3();
         const _carWorldQuat = new THREE.Quaternion();
         const _rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
@@ -133,8 +131,8 @@
         let discAngleDeg = 0;
 
         let discGroup, baseBeamGroup, armPivotGroup;
-        let btnXPressedPrev = false;
-        let btnYPressedPrev = false;
+        let btnAPressedPrev = false;
+        let btnBPressedPrev = false;
         let triggerPressedPrev = false;
         let targetPoint = null;
         let inCarView = false;
@@ -163,11 +161,9 @@
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
             dirLight.position.set(10, 20, 10);
             dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 1024;
-            dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            // Renderer WebXR ottimizzato
+            // Renderer WebXR
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -258,13 +254,13 @@
             backCyl.rotation.y = Math.PI / 2;
             worldGroup.add(backCyl);
 
-            // 8 Torri Faro sulla circonferenza (senza ombre per massimizzare il frame rate in VR)
-            const numTowers = 8;
+            // 4 Luci nella parte frontale della giostra (z > 0)
+            const frontAngles = [-Math.PI / 4, -Math.PI / 12, Math.PI / 12, Math.PI / 4];
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 6.0;
 
-            for (let i = 0; i < numTowers; i++) {
-                const angle = (i / numTowers) * Math.PI * 2;
+            for (let i = 0; i < 4; i++) {
+                const angle = frontAngles[i];
                 const posX = Math.sin(angle) * lightTowerRadius;
                 const posZ = Math.cos(angle) * lightTowerRadius;
 
@@ -278,11 +274,16 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                // castShadow = false per ottimizzare drasticamente le performance in VR
-                const spotLight = new THREE.SpotLight(0xffffff, 2.0, 45, Math.PI / 3, 0.4, 1);
+                const spotLight = new THREE.SpotLight(0xffffff, 2.2, 45, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
-                spotLight.target.position.set(0, 1, 0);
-                spotLight.castShadow = false; 
+                
+                // 2 dirette al centro della piattaforma, 2 sul fondale posteriore
+                if (i < 2) {
+                    spotLight.target.position.set(0, 1, 0);
+                } else {
+                    spotLight.target.position.set(0, 3, -11);
+                }
+                spotLight.castShadow = false; // Ottimizzato per VR
                 worldGroup.add(spotLight);
                 worldGroup.add(spotLight.target);
 
@@ -487,7 +488,7 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // Elaborazione Input Controller XR
+        // Elaborazione Input Controller XR (Mappatura aggiornata: X/Y Scala su sinistro, A Aggancio, B Carrozza su destro)
         function processXRControllers(delta) {
             const session = renderer.xr.getSession();
             if (!session) return;
@@ -511,23 +512,20 @@
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
 
-                    // Tasto X sul controller sinistro (indice 3) -> Attiva/Disattiva Aggancio
-                    const btnX = buttons[3] && buttons[3].pressed;
-                    if (btnX && !btnXPressedPrev) {
-                        toggleLock();
-                    }
-                    btnXPressedPrev = btnX;
-
-                    // Tasto Y sul controller sinistro (indice 4 o 5) -> Attiva/Disattiva Vista Carrozza
-                    const btnY = (buttons[4] && buttons[4].pressed) || (buttons[5] && buttons[5].pressed);
-                    if (btnY && !btnYPressedPrev) {
-                        inCarView = !inCarView;
-                        if (!inCarView) {
-                            worldGroup.scale.set(1, 1, 1);
-                            cameraRig.position.set(0, 3.0, 25);
+                    // Tasti X (-) e Y (+) sul controller sinistro per la scala del mondo (se non in vista carrozza)
+                    if (!inCarView) {
+                        const btnX = buttons[4] && buttons[4].pressed; // X button
+                        const btnY = buttons[5] && buttons[5].pressed; // Y button
+                        let currentScale = worldGroup.scale.x;
+                        if (btnX) {
+                            currentScale = Math.max(0.1, currentScale - scaleRate);
+                            worldGroup.scale.set(currentScale, currentScale, currentScale);
+                        }
+                        if (btnY) {
+                            currentScale = Math.min(5.0, currentScale + scaleRate);
+                            worldGroup.scale.set(currentScale, currentScale, currentScale);
                         }
                     }
-                    btnYPressedPrev = btnY;
 
                 } else if (source.handedness === 'right') {
                     if (Math.abs(xAxis) > DEADZONE) {
@@ -538,21 +536,25 @@
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
 
-                    // Tasti A (-) e B (+) sul controller destro per Scala del Mondo (se non in vista carrozza)
-                    if (!inCarView) {
-                        const btnA = buttons[4] && buttons[4].pressed;
-                        const btnB = buttons[5] && buttons[5].pressed;
-                        let currentScale = worldGroup.scale.x;
-                        if (btnA) {
-                            currentScale = Math.max(0.1, currentScale - scaleRate);
-                            worldGroup.scale.set(currentScale, currentScale, currentScale);
-                        }
-                        if (btnB) {
-                            currentScale = Math.min(5.0, currentScale + scaleRate);
-                            worldGroup.scale.set(currentScale, currentScale, currentScale);
+                    // Tasto A sul controller destro (indice 4) -> Aggancio / Sgancio Velocità
+                    const btnA = buttons[4] && buttons[4].pressed;
+                    if (btnA && !btnAPressedPrev) {
+                        toggleLock();
+                    }
+                    btnAPressedPrev = btnA;
+
+                    // Tasto B sul controller destro (indice 5) -> Vista Carrozza / Direzione Moto
+                    const btnB = buttons[5] && buttons[5].pressed;
+                    if (btnB && !btnBPressedPrev) {
+                        inCarView = !inCarView;
+                        if (!inCarView) {
+                            worldGroup.scale.set(1, 1, 1);
+                            cameraRig.position.set(0, 3.0, 25);
                         }
                     }
+                    btnBPressedPrev = btnB;
 
+                    // Grilletto destro (indice 0) -> Teletrasporto
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
 
@@ -635,7 +637,7 @@
 
             updateHudTexture();
 
-            // Aggiornamento continuo del colore delle 8 luci (ciclo HSL)
+            // Aggiornamento continuo del colore delle 4 luci frontali (ciclo HSL)
             const timeSec = currentTime * 0.0003;
             for (let i = 0; i < animatedSpotLights.length; i++) {
                 const hue = (timeSec + (i / animatedSpotLights.length)) % 1.0;
@@ -654,7 +656,7 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // Gestione Vista Carrozza (Direzione allineata al moto del disco tramite _rotOffset)
+            // Gestione Vista Carrozza (Direzione allineata al moto)
             if (inCarView && carriageGroups.length > 0) {
                 const car = carriageGroups[0];
                 car.getWorldPosition(_carWorldPos);
@@ -663,7 +665,7 @@
                 cameraRig.position.copy(_carWorldPos);
                 cameraRig.position.y += 0.35;
                 cameraRig.quaternion.copy(_carWorldQuat);
-                cameraRig.quaternion.multiply(_rotOffset); // Allineato nella direzione del moto
+                cameraRig.quaternion.multiply(_rotOffset);
             }
 
             if (!renderer.xr.isPresenting) {
