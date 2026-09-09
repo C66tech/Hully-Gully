@@ -3,16 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v1.7.0</title>
+    <title>Hully Gully WebXR Simulator v1.8.0</title>
     
-    <!-- Librerie CSS & WebXR -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+
+    <!-- Import Map per Three.js e moduli ufficiali -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
 
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        .a-enter-vr { display: none !important; }
+        body { margin: 0; overflow: hidden; background-color: #0d0f17; font-family: sans-serif; }
+        canvas { display: block; }
+        #VRButton, #ARButton {
+            position: absolute !important;
+            bottom: 20px !important;
+            padding: 10px 16px !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+            border-radius: 8px !important;
+            z-index: 100 !important;
+        }
+        #VRButton { left: calc(50% - 140px) !important; }
+        #ARButton { left: calc(50% + 10px) !important; }
         kbd {
             background-color: #1e293b;
             border: 1px solid #475569;
@@ -32,22 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v1.7.0
+                v1.8.0
             </span>
         </div>
-        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D - Polling XRSession Diretto</p>
-
-        <!-- Bottoni Selezione Modalità WebXR -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-            <button id="btnVR" onclick="enterXR('vr')" class="py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs rounded-xl shadow-lg border border-purple-400/30 transition flex items-center justify-center space-x-2">
-                <span>&#129504;</span>
-                <span>Avvia VR</span>
-            </button>
-            <button id="btnAR" onclick="enterXR('ar')" class="py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg border border-teal-400/30 transition flex items-center justify-center space-x-2">
-                <span>&#128083;</span>
-                <span>Avvia AR</span>
-            </button>
-        </div>
+        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D - Standard Three.js XR</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 border border-slate-700">
@@ -57,216 +64,46 @@
         <!-- Valori Correnti -->
         <div class="space-y-2.5 text-xs mb-4">
             <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
-                <span class="text-slate-300">Velocità BASE</span>
+                <span class="text-slate-300">Velocità BASE (<kbd>&larr;</kbd><kbd>&rarr;</kbd>)</span>
                 <span id="valVBase" class="text-fuchsia-400 font-mono font-bold">0.00</span>
             </div>
             <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
-                <span class="text-slate-300">Velocità DISCO</span>
+                <span class="text-slate-300">Velocità DISCO (<kbd>Z</kbd><kbd>X</kbd>)</span>
                 <span id="valVDisco" class="text-cyan-400 font-mono font-bold">0.00</span>
             </div>
             <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
-                <span class="text-slate-300">Angolo BRACCIO</span>
+                <span class="text-slate-300">Angolo BRACCIO (<kbd>&uarr;</kbd><kbd>&darr;</kbd>)</span>
                 <span id="valAng" class="text-amber-400 font-mono font-bold">0.0&deg;</span>
             </div>
         </div>
 
         <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
-            <p><strong>Mappatura Accumulatore VR:</strong></p>
-            <p>• Stick DX (Sx / Dx): Aumenta / Riduce VBASE</p>
-            <p>• Stick DX (Su / Giù): Aumenta / Riduce VANG</p>
-            <p>• Stick SX (Sx / Dx): Aumenta / Riduce VDISCO</p>
-            <p>• Tasto A / X: Aggancia / Sgancia Dondolio</p>
-            <p>• Grilletto DX: Teletrasporto (Quota H=3m)</p>
+            <p><kbd>Spazio</kbd> : Aggancia / Sgancia Dondolio (3s)</p>
+            <p><strong>VR Controls:</strong> Usa il trigger per premere i pulsanti della HUD o spingere i comandi, e il tasto Squeeze (lato) per afferrare la HUD.</p>
         </div>
     </div>
 
-    <!-- SCENA A-FRAME / WEBXR -->
-    <a-scene 
-        webxr="optionalFeatures: hit-test, local-floor, passthrough; referenceSpaceType: local-floor"
-        renderer="transparent: true; alpha: true; antialias: true; colorManagement: true; exposure: 1.0; shadowMapEnabled: true"
-        embedded
-        class="w-full h-screen">
+    <!-- SCRIPT PRINCIPALE MODULARE THREE.JS -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        <!-- AMBIENTE & LUCI -->
-        <a-sky id="skyBox" color="#0d0f17"></a-sky>
-        <a-entity light="type: ambient; color: #ffffff; intensity: 0.3"></a-entity>
-
-        <!-- 4 TORRI FARO A 12M D'ALTEZZA OGNI 90° -->
-        <a-entity position="0 0 -12">
-            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
-            <a-sphere radius="0.3" position="0 12 0" color="#00f0ff" material="shader: flat"></a-sphere>
-            <a-entity light="type: spot; color: #00f0ff; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 0 0"></a-entity>
-        </a-entity>
-
-        <a-entity position="12 0 0">
-            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
-            <a-sphere radius="0.3" position="0 12 0" color="#ff0077" material="shader: flat"></a-sphere>
-            <a-entity light="type: spot; color: #ff0077; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 90 0"></a-entity>
-        </a-entity>
-
-        <a-entity position="0 0 12">
-            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
-            <a-sphere radius="0.3" position="0 12 0" color="#00ff88" material="shader: flat"></a-sphere>
-            <a-entity light="type: spot; color: #00ff88; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 180 0"></a-entity>
-        </a-entity>
-
-        <a-entity position="-12 0 0">
-            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
-            <a-sphere radius="0.3" position="0 12 0" color="#ffcc00" material="shader: flat"></a-sphere>
-            <a-entity light="type: spot; color: #ffcc00; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 -90 0"></a-entity>
-        </a-entity>
-
-        <!-- AREA CALPESTABILE TELETRASPORTO -->
-        <a-plane id="teleportSurface" class="teleport-target" position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
-
-        <!-- GRIGLIA & PIATTAFORMA BASE (Y = 0) -->
-        <a-grid id="groundGrid" position="0 -0.61 0" grid="color: #334155; width: 70; height: 70"></a-grid>
-        <a-cylinder id="mainPlatform" class="teleport-target" radius="10" height="0.6" position="0 -0.3 0" color="#64748b" material="roughness: 0.6; metalness: 0.2" shadow="receive: true"></a-cylinder>
-        <a-cylinder id="wellBottom" radius="3.3" height="0.2" position="0 -0.7 0" color="#1e293b"></a-cylinder>
-
-        <!-- STRUTTURA DINAMICA GIOSTRA -->
-        <a-entity id="baseBeamGroup" position="0 -0.3 0">
-            <a-box width="6.0" height="0.4" depth="0.8" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
-            <a-cylinder radius="0.35" height="0.8" color="#0f172a" material="metalness: 0.9"></a-cylinder>
-
-            <!-- Cerniera Braccio Pieghevole (Inclinazione asse Z) -->
-            <a-entity id="armPivotGroup" position="3.0 0.2 0">
-                <a-cylinder radius="0.25" height="0.6" color="#1e293b" material="metalness: 0.9"></a-cylinder>
-                <a-box id="armMesh" width="6.0" height="0.4" depth="0.8" position="-3.0 0.2 0" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
-
-                <!-- Disco Rotante Giostra -->
-                <a-entity id="discPivotGroup" position="-6.0 0.2 0">
-                    <a-cylinder radius="0.3" height="0.6" color="#334155" material="metalness: 0.9"></a-cylinder>
-                    
-                    <a-entity id="discGroup">
-                        <a-cylinder radius="6.0" height="0.4" position="0 0.3 0" color="#1e1b4b" material="roughness: 0.3" shadow="cast: true; receive: true"></a-cylinder>
-                        <a-cone radius-bottom="1.5" radius-top="0" height="1.0" position="0 0.9 0" color="#0ea5e9" material="metalness: 0.5"></a-cone>
-                    </a-entity>
-                </a-entity>
-            </a-entity>
-        </a-entity>
-
-        <!-- TARGET CERCHIO PUNTAMENTO TELETRASPORTO -->
-        <a-ring id="teleportRing" radius-inner="0.4" radius-outer="0.6" color="#00ff88" rotation="-90 0 0" visible="false" material="shader: flat; opacity: 0.8"></a-ring>
-
-        <!-- RIG CAMERA & CONTROLLER 3D CON HUD OLOGRAFICO -->
-        <a-entity id="rig" position="0 3.0 25">
-            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: false"></a-camera>
-
-            <!-- Controller SX (Oculus Touch Nativi) -->
-            <a-entity id="leftController" oculus-touch-controls="hand: left">
-                <!-- PANNELLO HUD VR DEBUG -->
-                <a-entity id="hudVR" position="0.12 0.15 -0.2" rotation="-30 20 -10">
-                    <a-plane width="0.42" height="0.30" color="#0f172a" material="opacity: 0.9; transparent: true"></a-plane>
-                    <a-text value="HULLY GULLY DEBUG v1.7.0" position="-0.19 0.12 0.01" scale="0.18 0.18 0.18" color="#00f0ff"></a-text>
-                    
-                    <a-text id="hudVBase" value="VBASE: 0.00" position="-0.19 0.07 0.01" scale="0.16 0.16 0.16" color="#f43f5e"></a-text>
-                    <a-text id="hudVDisco" value="VDISCO: 0.00" position="-0.19 0.03 0.01" scale="0.16 0.16 0.16" color="#00f0ff"></a-text>
-                    <a-text id="hudVAng" value="VANG: 0.0 deg" position="-0.19 -0.01 0.01" scale="0.16 0.16 0.16" color="#ffcc00"></a-text>
-                    <a-text id="hudStatus" value="STATO: Sganciato" position="-0.19 -0.05 0.01" scale="0.15 0.15 0.15" color="#cbd5e1"></a-text>
-                    <a-text id="hudAxesL" value="STICK SX: X=0.00" position="-0.19 -0.09 0.01" scale="0.12 0.12 0.12" color="#94a3b8"></a-text>
-                    <a-text id="hudAxesR" value="STICK DX: X=0.00 Y=0.00" position="-0.19 -0.12 0.01" scale="0.12 0.12 0.12" color="#94a3b8"></a-text>
-                </a-entity>
-            </a-entity>
-
-            <!-- Controller DX con Laser Teletrasporto -->
-            <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right"
-                      raycaster="objects: .teleport-target; showLine: false; enabled: false"
-                      line="color: #00ff88; opacity: 0.7"></a-entity>
-        </a-entity>
-
-    </a-scene>
-
-    <!-- LOGICA JS VANILLA E CINEMATICA -->
-    <script>
-        const GAME_VERSION = "1.7.0";
+        const GAME_VERSION = "v1.8.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
-        const discGroup = document.getElementById('discGroup');
-        const baseBeamGroup = document.getElementById('baseBeamGroup');
-        const armPivotGroup = document.getElementById('armPivotGroup');
-        const skyBox = document.getElementById('skyBox');
-        const groundGrid = document.getElementById('groundGrid');
-        const uiContainer = document.getElementById('ui-container');
-        const rig = document.getElementById('rig');
-        const teleportRing = document.getElementById('teleportRing');
-        const rightController = document.getElementById('rightController');
+        let scene, camera, renderer, controls;
+        let cameraRig;
+        let controllers = [], controllerGrips = [], gunPivots = [];
+        let laserLines = [];
+        let hudGroup = null;
+        let grabbedHud = null;
+        let hudButtons = [];
+        let hudCanvas, hudCtx, hudTexture;
+        let btnVBaseUp, btnVBaseDown, btnVDiscoUp, btnVDiscoDown, btnAngUp, btnAngDown, btnLockMesh;
 
-        // UI 2D
-        const valVBase = document.getElementById('valVBase');
-        const valVDisco = document.getElementById('valVDisco');
-        const valAng = document.getElementById('valAng');
-        const badgeStatus = document.getElementById('badgeStatus');
-        const badgeText = document.getElementById('badgeText');
-
-        // HUD VR 3D
-        const hudVBase = document.getElementById('hudVBase');
-        const hudVDisco = document.getElementById('hudVDisco');
-        const hudVAng = document.getElementById('hudVAng');
-        const hudStatus = document.getElementById('hudStatus');
-        const hudAxesL = document.getElementById('hudAxesL');
-        const hudAxesR = document.getElementById('hudAxesR');
-
-        const numCars = 16;
-        const discRadius = 6.0;
-        const spokeColors = ['#00f0ff', '#ff0077', '#ffcc00'];
-        const halfStepAngle = (Math.PI * 2 / numCars) / 2;
-
-        // Inizializzazione 16 Carrozze e 16 Raggi
-        window.addEventListener('load', () => {
-            const discEl = discGroup;
-
-            for (let i = 0; i < numCars; i++) {
-                const angle = (i / numCars) * Math.PI * 2;
-                const carRadius = discRadius - 0.5;
-                const posX = Math.sin(angle) * carRadius;
-                const posZ = Math.cos(angle) * carRadius;
-                const rotY = (angle * 180 / Math.PI);
-
-                const carGroup = document.createElement('a-entity');
-                carGroup.setAttribute('position', `${posX} 0.3 ${posZ}`);
-                carGroup.setAttribute('rotation', `0 ${rotY} 0`);
-
-                const bodyColor = i % 2 === 0 ? '#f43f5e' : '#0ea5e9';
-                
-                const body = document.createElement('a-box');
-                body.setAttribute('width', '1.0');
-                body.setAttribute('height', '0.5');
-                body.setAttribute('depth', '1.8');
-                body.setAttribute('position', '0 0.4 0');
-                body.setAttribute('color', bodyColor);
-                body.setAttribute('shadow', 'cast: true');
-                carGroup.appendChild(body);
-
-                const seat = document.createElement('a-box');
-                seat.setAttribute('width', '0.7');
-                seat.setAttribute('height', '0.3');
-                seat.setAttribute('depth', '1.4');
-                seat.setAttribute('position', '-0.1 0.5 0');
-                seat.setAttribute('color', '#0f172a');
-                carGroup.appendChild(seat);
-
-                discEl.appendChild(carGroup);
-
-                const spokeAngle = angle + halfStepAngle;
-                const spokeX = Math.sin(spokeAngle) * (discRadius / 2);
-                const spokeZ = Math.cos(spokeAngle) * (discRadius / 2);
-                const spokeRotY = (spokeAngle * 180 / Math.PI);
-
-                const spoke = document.createElement('a-box');
-                spoke.setAttribute('width', '0.12');
-                spoke.setAttribute('height', '0.05');
-                spoke.setAttribute('depth', `${discRadius - 0.6}`);
-                spoke.setAttribute('position', `${spokeX} 0.52 ${spokeZ}`);
-                spoke.setAttribute('rotation', `0 ${spokeRotY} 0`);
-                spoke.setAttribute('color', spokeColors[i % 3]);
-                spoke.setAttribute('material', 'shader: flat');
-
-                discEl.appendChild(spoke);
-            }
-        });
-
-        // Parametri Meccanica
+        // Variabili Giostra
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
@@ -277,254 +114,432 @@
         let startVDisco = 0;
         const TRANSITION_DURATION = 3000;
 
-        let targetPoint = null;
-        let btnPressedPrev = false;
-        let triggerPressedPrev = false;
+        let baseAngleDeg = 0;
+        let discAngleDeg = 0;
 
+        let discGroup, baseBeamGroup, armPivotGroup;
         const keysPressed = {};
 
-        // Input Tastiera PC
-        window.addEventListener('keydown', (e) => {
-            keysPressed[e.key.toLowerCase()] = true;
-            if (e.code === 'Space') {
-                e.preventDefault();
-                toggleLock();
-            }
-        });
+        init();
 
-        window.addEventListener('keyup', (e) => {
-            keysPressed[e.key.toLowerCase()] = false;
-        });
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d0f17);
+            scene.fog = new THREE.FogExp2(0x0d0f17, 0.015);
+
+            cameraRig = new THREE.Group();
+            scene.add(cameraRig);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            cameraRig.add(camera);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            // Renderer WebXR
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.xr.enabled = true;
+            renderer.xr.setReferenceSpaceType('local-floor');
+            document.body.appendChild(renderer.domElement);
+
+            // OrbitControls per Desktop
+            controls = new OrbitControls(camera, renderer.domElement);
+            cameraRig.position.set(0, 1.6, 25);
+            controls.target.set(0, 2.5, 0);
+            controls.update();
+
+            // Eventi sessione VR/AR
+            renderer.xr.addEventListener('sessionstart', () => {
+                controls.enabled = false;
+                cameraRig.position.set(0, 3.0, 25); // Altezza visore a 3m come richiesto
+                const session = renderer.xr.getSession();
+                if (session.environmentBlendMode === 'additive' || session.environmentBlendMode === 'alpha-blend') {
+                    scene.background = null;
+                }
+            });
+
+            renderer.xr.addEventListener('sessionend', () => {
+                controls.enabled = true;
+                cameraRig.position.set(0, 1.6, 25);
+                scene.background = new THREE.Color(0x0d0f17);
+            });
+
+            const xrOptions = { requiredFeatures: ['local-floor'] };
+            document.body.appendChild(VRButton.createButton(renderer, xrOptions));
+            document.body.appendChild(ARButton.createButton(renderer, xrOptions));
+
+            createEnvironment();
+            setupControllers();
+            create3DHUD();
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', (e) => {
+                keysPressed[e.key.toLowerCase()] = true;
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    toggleLock();
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                keysPressed[e.key.toLowerCase()] = false;
+            });
+
+            renderer.setAnimationLoop(animate);
+        }
+
+        function createEnvironment() {
+            // Torri Faro (12m)
+            const lightTowerRadius = 12.0;
+            const lightTowerHeight = 12.0;
+            const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
+
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2;
+                const posX = Math.sin(angle) * lightTowerRadius;
+                const posZ = Math.cos(angle) * lightTowerRadius;
+
+                const towerGroup = new THREE.Group();
+                towerGroup.position.set(posX, 0, posZ);
+
+                const pole = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.12, 0.25, lightTowerHeight, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 })
+                );
+                pole.position.y = lightTowerHeight / 2;
+                towerGroup.add(pole);
+
+                const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 50, Math.PI / 3, 0.4, 1);
+                spotLight.position.set(posX, lightTowerHeight, posZ);
+                spotLight.target.position.set(0, 1, 0);
+                spotLight.castShadow = true;
+                scene.add(spotLight);
+                scene.add(spotLight.target);
+
+                scene.add(towerGroup);
+            }
+
+            // Griglia e Piattaforma Base
+            const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x334155);
+            grid.position.y = -0.61;
+            scene.add(grid);
+
+            const platformGeo = new THREE.CylinderGeometry(10, 10, 0.6, 64);
+            const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
+            const platform = new THREE.Mesh(platformGeo, platformMat);
+            platform.position.y = -0.3;
+            platform.receiveShadow = true;
+            scene.add(platform);
+
+            // Giostra Principale
+            baseBeamGroup = new THREE.Group();
+            baseBeamGroup.position.y = -0.3;
+            scene.add(baseBeamGroup);
+
+            const beamMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
+            const baseBeamMesh = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.4, 0.8), beamMat);
+            baseBeamGroup.add(baseBeamMesh);
+
+            armPivotGroup = new THREE.Group();
+            armPivotGroup.position.set(3.0, 0.2, 0);
+            baseBeamGroup.add(armPivotGroup);
+
+            const armMesh = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.4, 0.8), beamMat);
+            armMesh.position.set(-3.0, 0.2, 0);
+            armPivotGroup.add(armMesh);
+
+            const discPivotGroup = new THREE.Group();
+            discPivotGroup.position.set(-6.0, 0.2, 0);
+            armPivotGroup.add(discPivotGroup);
+
+            discGroup = new THREE.Group();
+            discPivotGroup.add(discGroup);
+
+            const discRadius = 6.0;
+            const discMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(discRadius, discRadius * 0.95, 0.4, 64),
+                new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 })
+            );
+            discMesh.position.y = 0.30;
+            discGroup.add(discMesh);
+
+            const centerCone = new THREE.Mesh(
+                new THREE.ConeGeometry(1.5, 1, 24),
+                new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.5 })
+            );
+            centerCone.position.y = 0.9;
+            discGroup.add(centerCone);
+
+            // Generazione 16 Carrozze e Raggi
+            const numCars = 16;
+            const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
+            const halfStepAngle = (Math.PI * 2 / numCars) / 2;
+
+            for (let i = 0; i < numCars; i++) {
+                const angle = (i / numCars) * Math.PI * 2;
+                const carRadius = discRadius - 0.5;
+                const carGroup = new THREE.Group();
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.3, Math.cos(angle) * carRadius);
+                carGroup.rotation.y = angle;
+
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.0, 0.5, 1.8),
+                    new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xf43f5e : 0x0ea5e9, roughness: 0.2 })
+                );
+                body.position.y = 0.4;
+                carGroup.add(body);
+                discGroup.add(carGroup);
+
+                // Raggi tra carrozze
+                const spokeAngle = angle + halfStepAngle;
+                const spoke = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.12, 0.05, discRadius - 0.6),
+                    new THREE.MeshBasicMaterial({ color: spokeColors[i % 3] })
+                );
+                spoke.position.set(Math.sin(spokeAngle) * (discRadius / 2), 0.52, Math.cos(spokeAngle) * (discRadius / 2));
+                spoke.rotation.y = spokeAngle;
+                discGroup.add(spoke);
+            }
+        }
+
+        function createRedGunModel() {
+            const gunGroup = new THREE.Group();
+            const redGunMat = new THREE.MeshStandardMaterial({ color: 0xe60000, roughness: 0.2, metalness: 0.5 });
+            const blackDetailMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.26, 16), redGunMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(0, 0, -0.1);
+            gunGroup.add(barrel);
+
+            const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.04), blackDetailMat);
+            handle.position.set(0, -0.05, 0.02);
+            handle.rotation.x = -0.3;
+            gunGroup.add(handle);
+
+            // Linea Laser di puntamento
+            const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, -0.23), new THREE.Vector3(0, 0, -15)]);
+            const laserLine = new THREE.Line(laserGeo, new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.7 }));
+            gunGroup.add(laserLine);
+            laserLines.push(laserLine);
+
+            return gunGroup;
+        }
+
+        function setupControllers() {
+            for (let i = 0; i < 2; i++) {
+                const controller = renderer.xr.getController(i);
+                const grip = renderer.xr.getControllerGrip(i);
+
+                const pivot = new THREE.Group();
+                const gun = createRedGunModel();
+                pivot.add(gun);
+                controller.add(pivot);
+
+                // Evento sparo / interazione pulsanti HUD
+                controller.addEventListener('selectstart', () => {
+                    triggerAction(controller);
+                });
+
+                // Evento Squeeze per afferrare la HUD con il grip laterale
+                controller.addEventListener('squeezestart', () => {
+                    if (!hudGroup) return;
+                    const cPos = new THREE.Vector3();
+                    controller.getWorldPosition(cPos);
+                    const hPos = new THREE.Vector3();
+                    hudGroup.getWorldPosition(hPos);
+
+                    if (cPos.distanceTo(hPos) < 0.8) {
+                        grabbedHud = controller;
+                        controller.attach(hudGroup);
+                    }
+                });
+
+                controller.addEventListener('squeezeend', () => {
+                    if (grabbedHud === controller) {
+                        grabbedHud = null;
+                        cameraRig.attach(hudGroup);
+                    }
+                });
+
+                cameraRig.add(controller);
+                scene.add(grip);
+                controllers.push(controller);
+                controllerGrips.push(grip);
+                gunPivots.push(pivot);
+            }
+        }
+
+        function create3DHUD() {
+            hudGroup = new THREE.Group();
+            hudGroup.position.set(-1.0, 0.4, -1.2);
+            hudGroup.rotation.y = THREE.MathUtils.degToRad(25);
+
+            hudCanvas = document.createElement('canvas');
+            hudCanvas.width = 600; hudCanvas.height = 340;
+            hudCtx = hudCanvas.getContext('2d');
+            hudTexture = new THREE.CanvasTexture(hudCanvas);
+
+            const panelMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.2, 0.68),
+                new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, side: THREE.DoubleSide })
+            );
+            hudGroup.add(panelMesh);
+
+            // Pulsanti HUD interattivi
+            btnVBaseDown = create3DButton("VBase -", 0.26, 0.1);
+            btnVBaseDown.position.set(-0.3, -0.42, 0);
+            btnVBaseDown.userData = { action: 'vbase_down' };
+            hudGroup.add(btnVBaseDown); hudButtons.push(btnVBaseDown);
+
+            btnVBaseUp = create3DButton("VBase +", 0.26, 0.1);
+            btnVBaseUp.position.set(0.3, -0.42, 0);
+            btnVBaseUp.userData = { action: 'vbase_up' };
+            hudGroup.add(btnVBaseUp); hudButtons.push(btnVBaseUp);
+
+            btnVDiscoDown = create3DButton("VDisco -", 0.26, 0.1);
+            btnVDiscoDown.position.set(-0.3, -0.55, 0);
+            btnVDiscoDown.userData = { action: 'vdisco_down' };
+            hudGroup.add(btnVDiscoDown); hudButtons.push(btnVDiscoDown);
+
+            btnVDiscoUp = create3DButton("VDisco +", 0.26, 0.1);
+            btnVDiscoUp.position.set(0.3, -0.55, 0);
+            btnVDiscoUp.userData = { action: 'vdisco_up' };
+            hudGroup.add(btnVDiscoUp); hudButtons.push(btnVDiscoUp);
+
+            btnLockMesh = create3DButton("Aggancia 1:1", 0.56, 0.1, "#00ffcc");
+            btnLockMesh.position.set(0, -0.68, 0);
+            btnLockMesh.userData = { action: 'toggle_lock' };
+            hudGroup.add(btnLockMesh); hudButtons.push(btnLockMesh);
+
+            cameraRig.add(hudGroup);
+            updateHudTexture();
+        }
+
+        function create3DButton(label, width, height, strokeColor = '#00ff66') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 300; canvas.height = 100;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#142a14'; ctx.fillRect(0, 0, 300, 100);
+            ctx.strokeStyle = strokeColor; ctx.lineWidth = 6; ctx.strokeRect(4, 4, 292, 92);
+            ctx.fillStyle = strokeColor; ctx.font = 'bold 22px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 150, 50);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(width, height, 0.04),
+                new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 })
+            );
+            return mesh;
+        }
+
+        function updateHudTexture() {
+            hudCtx.fillStyle = '#0f1a0f'; hudCtx.fillRect(0, 0, 600, 340);
+            hudCtx.strokeStyle = '#00ff66'; hudCtx.lineWidth = 8; hudCtx.strokeRect(4, 4, 592, 332);
+
+            hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 26px Arial'; hudCtx.fillText('HULLY GULLY CONTROLLER', 28, 45);
+
+            hudCtx.fillStyle = '#ffffff'; hudCtx.font = 'bold 22px Arial';
+            hudCtx.fillText('Velocità BASE: ' + vBaseVal.toFixed(2), 28, 100);
+            hudCtx.fillText('Velocità DISCO: ' + vDiscoVal.toFixed(2), 28, 150);
+            hudCtx.fillText('Angolo BRACCIO: ' + angVal.toFixed(1) + '°', 28, 200);
+
+            hudCtx.fillStyle = isLocked ? '#00ff66' : '#ff2a6d';
+            hudCtx.fillText('Stato: ' + (isLocked ? 'AGGANCIATO (1:1)' : 'SGANCIATO'), 28, 255);
+
+            hudTexture.needsUpdate = true;
+        }
+
+        function triggerAction(controller) {
+            const pivot = controller.children.find(c => gunPivots.includes(c));
+            if (!pivot) return;
+
+            const origin = new THREE.Vector3();
+            const worldQuat = new THREE.Quaternion();
+            pivot.getWorldPosition(origin);
+            pivot.getWorldQuaternion(worldQuat);
+            const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(worldQuat);
+
+            const raycaster = new THREE.Raycaster(origin, direction);
+            const intersects = raycaster.intersectObjects(hudButtons, false);
+
+            if (intersects.length > 0) {
+                const hitBtn = intersects[0].object;
+                const action = hitBtn.userData.action;
+
+                if (action === 'vbase_down') vBaseVal = Math.max(0.0, vBaseVal - 0.5);
+                else if (action === 'vbase_up') vBaseVal = Math.min(3.0, vBaseVal + 0.5);
+                else if (action === 'vdisco_down') vDiscoVal = Math.max(0.0, vDiscoVal - 0.5);
+                else if (action === 'vdisco_up') vDiscoVal = Math.min(3.0, vDiscoVal + 0.5);
+                else if (action === 'toggle_lock') toggleLock();
+
+                if (isLocked && (action.includes('vbase') || action.includes('vdisco'))) {
+                    vDiscoVal = vBaseVal;
+                }
+                updateHudTexture();
+            }
+        }
 
         function toggleLock() {
             isLocked = !isLocked;
             if (isLocked) {
-                if (Math.abs(vBaseVal - vDiscoVal) < 0.005) {
-                    vDiscoVal = vBaseVal;
-                    isTransitioning = false;
-                    setLockedUI();
-                } else {
-                    isTransitioning = true;
-                    transitionStartTime = performance.now();
-                    startVDisco = vDiscoVal;
-                    badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-amber-500/20 text-amber-300 font-semibold text-xs rounded-xl border border-amber-500/40 flex items-center justify-center space-x-2";
-                }
+                vDiscoVal = vBaseVal;
+                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl shadow-lg border border-emerald-500/40 flex items-center justify-center space-x-2";
+                badgeText.innerHTML = '&#128279; Stato: Agganciato (1:1)';
             } else {
-                isTransitioning = false;
-                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center space-x-2";
+                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg border border-slate-700 flex items-center justify-center space-x-2";
                 badgeText.innerHTML = '&#128275; Stato: Sganciato';
             }
+            updateHudTexture();
         }
 
-        function setLockedUI() {
-            badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl border border-emerald-500/40 flex items-center justify-center space-x-2";
-            badgeText.innerHTML = '&#128279; Stato: Agganciato (1:1)';
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function easeInOutSine(x) {
-            return -(Math.cos(Math.PI * x) - 1) / 2;
+        const clock = new THREE.Clock();
+
+        function animate() {
+            const delta = clock.getDelta();
+
+            // Input Tastiera PC
+            const speedStep = 0.5 * delta;
+            const angleStep = 10.0 * delta;
+
+            if (keysPressed['arrowleft']) vBaseVal = Math.max(0.0, vBaseVal - speedStep);
+            if (keysPressed['arrowright']) vBaseVal = Math.min(3.0, vBaseVal + speedStep);
+            if (keysPressed['z']) vDiscoVal = Math.max(0.0, vDiscoVal - speedStep);
+            if (keysPressed['x']) vDiscoVal = Math.min(3.0, vDiscoVal + speedStep);
+            if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
+            if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
+
+            if (isLocked) vDiscoVal = vBaseVal;
+
+            // Aggiornamento UI 2D
+            document.getElementById('valVBase').textContent = vBaseVal.toFixed(2);
+            document.getElementById('valVDisco').textContent = vDiscoVal.toFixed(2);
+            document.getElementById('valAng').textContent = angVal.toFixed(1) + '°';
+
+            // Cinematica 3D Giostra
+            const vBaseSpeed = vBaseVal * 0.02;
+            const vDiscoSpeed = vDiscoVal * 0.02;
+            const angRad = (angVal * Math.PI) / 180;
+
+            baseAngleDeg += vBaseSpeed * 30;
+            discAngleDeg += vDiscoSpeed * 30;
+
+            if (baseBeamGroup) baseBeamGroup.rotation.y = baseAngleDeg;
+            if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
+            if (discGroup) discGroup.rotation.y = -discAngleDeg;
+
+            controls.update();
+            renderer.render(scene, camera);
         }
-
-        // RAYCASTER TELETRASPORTO
-        rightController.addEventListener('raycaster-intersection', (evt) => {
-            const intersection = evt.detail.intersections[0];
-            if (intersection) {
-                targetPoint = intersection.point;
-                teleportRing.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);
-            }
-        });
-
-        // -------------------------------------------------------------
-        // POLLING DIRETTO NATIVO SULLA SESSIONE WEBXR (QUEST 3 FIX)
-        // -------------------------------------------------------------
-        function pollWebXRInputs(deltaTime) {
-            const sceneEl = document.querySelector('a-scene');
-            if (!sceneEl || !sceneEl.renderer || !sceneEl.renderer.xr) return;
-
-            const session = sceneEl.renderer.xr.getSession();
-            if (!session) return; // Salta se non siamo in modalità immersiva VR/AR
-
-            const DEADZONE = 0.15;
-            const baseRate = 1.2 * deltaTime; 
-            const angleRate = 15.0 * deltaTime;
-
-            let debugStickLX = 0;
-            let debugStickRX = 0;
-            let debugStickRY = 0;
-
-            for (const source of session.inputSources) {
-                if (!source.gamepad) continue;
-
-                const axes = source.gamepad.axes;
-                const buttons = source.gamepad.buttons;
-
-                // Quest 3 Mappatura: asse 2 (X), asse 3 (Y). Fallback: 0 (X), 1 (Y).
-                const xAxis = axes.length > 2 ? axes[2] : (axes[0] || 0);
-                const yAxis = axes.length > 3 ? axes[3] : (axes[1] || 0);
-
-                if (source.handedness === 'left') {
-                    debugStickLX = Math.abs(xAxis) > DEADZONE ? xAxis : 0;
-                    if (debugStickLX !== 0) {
-                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + debugStickLX * baseRate));
-                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
-                    }
-                }
-
-                if (source.handedness === 'right') {
-                    debugStickRX = Math.abs(xAxis) > DEADZONE ? xAxis : 0;
-                    debugStickRY = Math.abs(yAxis) > DEADZONE ? yAxis : 0;
-
-                    // X: VBASE
-                    if (debugStickRX !== 0) {
-                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + debugStickRX * baseRate));
-                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
-                    }
-
-                    // Y: VANG (Inclinazione braccio)
-                    if (debugStickRY !== 0) {
-                        angVal = Math.max(0.0, Math.min(22.0, angVal - debugStickRY * angleRate));
-                    }
-
-                    // Tasto A (Indice 4 per Meta Quest)
-                    const aBtn = buttons[4] && buttons[4].pressed;
-                    if (aBtn && !btnPressedPrev) {
-                        toggleLock();
-                    }
-                    btnPressedPrev = aBtn;
-
-                    // Grilletto (Indice 0)
-                    const trigger = buttons[0] && buttons[0].pressed;
-                    if (trigger && !triggerPressedPrev) {
-                        rightController.setAttribute('raycaster', 'enabled', true);
-                        rightController.setAttribute('raycaster', 'showLine', true);
-                        teleportRing.setAttribute('visible', true);
-                    } else if (!trigger && triggerPressedPrev) {
-                        if (targetPoint) {
-                            rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
-                        }
-                        targetPoint = null;
-                        rightController.setAttribute('raycaster', 'enabled', false);
-                        rightController.setAttribute('raycaster', 'showLine', false);
-                        teleportRing.setAttribute('visible', false);
-                    }
-                    triggerPressedPrev = trigger;
-                }
-            }
-
-            // Aggiorna valori debug assi nell'HUD
-            hudAxesL.setAttribute('value', `STICK SX: X=${debugStickLX.toFixed(2)}`);
-            hudAxesR.setAttribute('value', `STICK DX: X=${debugStickRX.toFixed(2)} Y=${debugStickRY.toFixed(2)}`);
-        }
-
-        // LOOP DI ANIMAZIONE CINEMATICA
-        let baseAngleDeg = 0;
-        let discAngleDeg = 0;
-        let lastTime = performance.now();
-
-        function tick(currentTime) {
-            requestAnimationFrame(tick);
-
-            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
-            lastTime = currentTime;
-
-            // 1. Lettura WebXR Nativa (se in VR)
-            pollWebXRInputs(deltaTime);
-
-            // 2. Lettura Tastiera PC
-            const speedStep = 0.35 * deltaTime;
-            const angleStep = 8.0 * deltaTime;
-
-            if (keysPressed['arrowleft']) {
-                vBaseVal = Math.max(0.0, vBaseVal - speedStep);
-                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
-            }
-            if (keysPressed['arrowright']) {
-                vBaseVal = Math.min(3.0, vBaseVal + speedStep);
-                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
-            }
-            if (keysPressed['z']) {
-                vDiscoVal = Math.max(0.0, vDiscoVal - speedStep);
-                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
-            }
-            if (keysPressed['x']) {
-                vDiscoVal = Math.min(3.0, vDiscoVal + speedStep);
-                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
-            }
-            if (keysPressed['arrowup']) {
-                angVal = Math.min(22.0, angVal + angleStep);
-            }
-            if (keysPressed['arrowdown']) {
-                angVal = Math.max(0.0, angVal - angleStep);
-            }
-
-            // 3. Gestione Transizione Aggancio
-            let statusStr = isLocked ? "Agganciato (1:1)" : "Sganciato";
-            if (isLocked && isTransitioning) {
-                const elapsed = currentTime - transitionStartTime;
-                const progress = Math.min(elapsed / TRANSITION_DURATION, 1.0);
-                const remTime = Math.max(0, (TRANSITION_DURATION - elapsed) / 1000).toFixed(1);
-                
-                badgeText.innerHTML = `&#9203; Aggancio in corso: ${remTime}s`;
-                statusStr = `Aggancio: ${remTime}s`;
-                
-                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easeInOutSine(progress);
-
-                if (progress >= 1.0) {
-                    isTransitioning = false;
-                    vDiscoVal = vBaseVal;
-                    setLockedUI();
-                }
-            }
-
-            // 4. Aggiorna UI 2D
-            valVBase.textContent = vBaseVal.toFixed(2);
-            valVDisco.textContent = vDiscoVal.toFixed(2);
-            valAng.textContent = angVal.toFixed(1) + '°';
-
-            // 5. Aggiorna HUD 3D VR
-            hudVBase.setAttribute('value', `VBASE: ${vBaseVal.toFixed(2)}`);
-            hudVDisco.setAttribute('value', `VDISCO: ${vDiscoVal.toFixed(2)}`);
-            hudVAng.setAttribute('value', `VANG: ${angVal.toFixed(1)} deg`);
-            hudStatus.setAttribute('value', `STATO: ${statusStr}`);
-
-            // 6. Applicazione Cinematica 3D A-Frame
-            baseAngleDeg += (vBaseVal * 20) * deltaTime * 60;
-            discAngleDeg += (vDiscoVal * 20) * deltaTime * 60;
-
-            baseBeamGroup.setAttribute('rotation', `0 ${baseAngleDeg} 0`);
-            armPivotGroup.setAttribute('rotation', `0 0 ${-angVal}`); // Inclinazione su asse Z
-            discGroup.setAttribute('rotation', `0 ${-discAngleDeg} 0`);
-        }
-
-        requestAnimationFrame(tick);
-
-        // Attivazione WebXR AR/VR
-        function enterXR(mode) {
-            const sceneEl = document.querySelector('a-scene');
-            
-            if (mode === 'ar') {
-                skyBox.setAttribute('visible', 'false');
-                groundGrid.setAttribute('visible', 'false');
-                if (sceneEl.sceneEl && sceneEl.sceneEl.renderer) {
-                    sceneEl.sceneEl.renderer.setClearColor(0x000000, 0);
-                }
-                sceneEl.enterVR();
-            } else {
-                skyBox.setAttribute('visible', 'true');
-                groundGrid.setAttribute('visible', 'true');
-                sceneEl.enterVR();
-            }
-        }
-
-        document.querySelector('a-scene').addEventListener('enter-vr', () => {
-            uiContainer.classList.add('opacity-0', 'pointer-events-none');
-        });
-
-        document.querySelector('a-scene').addEventListener('exit-vr', () => {
-            uiContainer.classList.remove('opacity-0', 'pointer-events-none');
-            skyBox.setAttribute('visible', 'true');
-            groundGrid.setAttribute('visible', 'true');
-        });
     </script>
 </body>
 </html>
