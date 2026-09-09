@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.5.0</title>
+    <title>Hully Gully WebXR Simulator v2.6.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.5.0
+                v2.6.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore 12m - Camera On Board Carrozza</p>
+        <p class="text-xs text-slate-500 mb-4">Simulatore 12m - World Scale & Car Camera +90° CCW</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -79,11 +79,11 @@
 
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
-            <p>• Stick SX (Oriz): VDISCO | (Vert): ZOOM SCALA MONDO</p>
+            <p>• Stick SX (Oriz): VDISCO | (Vert): <strong>Scala del Mondo</strong></p>
             <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
-            <p>• Tasto A/X (Sinistro): <strong>Attiva/Disattiva Vista Carrozza</strong></p>
+            <p>• Tasto A/X (Sinistro): Vista Carrozza (+90° CCW)</p>
             <p>• Tasto A (Destro): Aggancio / Sgancio 1:1 (3s)</p>
-            <p>• Grilletto DX: Teletrasporto sicuro sul pavimento</p>
+            <p>• Grilletto DX: Teletrasporto sicuro</p>
         </div>
     </div>
 
@@ -95,11 +95,11 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.5.0";
+        const GAME_VERSION = "v2.6.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
-        let cameraRig;
+        let cameraRig, worldGroup;
         let controllers = [], controllerGrips = [];
         let hudGroup = null;
         let hudCanvas, hudCtx, hudTexture;
@@ -137,6 +137,10 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xe2e8f0);
             scene.fog = new THREE.FogExp2(0xe2e8f0, 0.01);
+
+            // Gruppo del Mondo (per la scala globale VR)
+            worldGroup = new THREE.Group();
+            scene.add(worldGroup);
 
             cameraRig = new THREE.Group();
             scene.add(cameraRig);
@@ -208,7 +212,7 @@
         }
 
         function createEnvironment() {
-            // Torri Faro (Altezza 6m, pali sottili)
+            // Torri Faro (Altezza 6m, pali sottili) all'interno di worldGroup
             const lightTowerRadius = 12.0;
             const lightTowerHeight = 6.0;
             const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
@@ -232,10 +236,10 @@
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = true;
-                scene.add(spotLight);
-                scene.add(spotLight.target);
+                worldGroup.add(spotLight);
+                worldGroup.add(spotLight.target);
 
-                scene.add(towerGroup);
+                worldGroup.add(towerGroup);
             }
 
             // Piano Pavimento Grigio Chiaro e Griglia
@@ -245,12 +249,12 @@
             ground.rotation.x = -Math.PI / 2;
             ground.position.y = -0.62;
             ground.receiveShadow = true;
-            scene.add(ground);
+            worldGroup.add(ground);
             teleportTargets.push(ground);
 
             const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x64748b);
             grid.position.y = -0.61;
-            scene.add(grid);
+            worldGroup.add(grid);
 
             // Piattaforma Base Giostra (Diametro 12m -> Raggio 6m)
             const platformGeo = new THREE.CylinderGeometry(10, 10, 0.6, 64);
@@ -258,7 +262,7 @@
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
             platform.receiveShadow = true;
-            scene.add(platform);
+            worldGroup.add(platform);
             teleportTargets.push(platform);
 
             // Cerchio di destinazione teletrasporto
@@ -267,12 +271,12 @@
             const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
             teleportRing = new THREE.Mesh(ringGeo, ringMat);
             teleportRing.visible = false;
-            scene.add(teleportRing);
+            worldGroup.add(teleportRing);
 
             // Giostra Principale
             baseBeamGroup = new THREE.Group();
             baseBeamGroup.position.y = -0.3;
-            scene.add(baseBeamGroup);
+            worldGroup.add(baseBeamGroup);
 
             const beamMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
             const baseBeamMesh = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.4, 0.8), beamMat);
@@ -328,7 +332,7 @@
                 carGroup.add(body);
                 discGroup.add(carGroup);
 
-                carriageGroups.push(carGroup); // Memorizziamo la carrozza per la vista interna
+                carriageGroups.push(carGroup);
 
                 const spokeAngle = angle + halfStepAngle;
                 const spoke = new THREE.Mesh(
@@ -443,7 +447,7 @@
             const DEADZONE = 0.15;
             const speedRate = 1.2 * delta;
             const angleRate = 10.0 * delta;
-            const scaleRate = 1.5 * delta;
+            const scaleRate = 1.0 * delta;
 
             for (const source of session.inputSources) {
                 if (!source.gamepad) continue;
@@ -458,10 +462,11 @@
                         vDiscoVal = Math.max(0.0, Math.min(MAX_SPEED, vDiscoVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
+                    // Levetta SX Verticale -> Scala del Mondo (World Scale)
                     if (Math.abs(yAxis) > DEADZONE) {
-                        let currentScale = cameraRig.scale.x;
-                        currentScale = Math.max(0.2, Math.min(4.0, currentScale - yAxis * scaleRate));
-                        cameraRig.scale.set(currentScale, currentScale, currentScale);
+                        let currentScale = worldGroup.scale.x;
+                        currentScale = Math.max(0.1, Math.min(5.0, currentScale - yAxis * scaleRate));
+                        worldGroup.scale.set(currentScale, currentScale, currentScale);
                     }
 
                     // Tasto A / X sul controller sinistro -> Attiva/Disattiva Vista Carrozza
@@ -469,7 +474,7 @@
                     if (btnCar && !btnCarPressedPrev) {
                         inCarView = !inCarView;
                         if (!inCarView) {
-                            cameraRig.scale.set(1, 1, 1);
+                            worldGroup.scale.set(1, 1, 1);
                             cameraRig.position.set(0, 3.0, 25);
                         }
                     }
@@ -544,7 +549,7 @@
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
@@ -585,7 +590,7 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // Gestione Vista Carrozza (Camera On Board)
+            // Gestione Vista Carrozza (Camera On Board con rotazione +90° CCW)
             if (inCarView && carriageGroups.length > 0) {
                 const car = carriageGroups[0];
                 const carWorldPos = new THREE.Vector3();
@@ -593,10 +598,13 @@
                 car.getWorldPosition(carWorldPos);
                 car.getWorldQuaternion(carWorldQuat);
 
-                // Posiziona il rig dentro la carrozza (altezza sedile)
                 cameraRig.position.copy(carWorldPos);
                 cameraRig.position.y += 0.35;
                 cameraRig.quaternion.copy(carWorldQuat);
+
+                // Rotazione addizionale di 90° in senso antiorario (+Math.PI / 2 su asse Y locale)
+                const rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+                cameraRig.quaternion.multiply(rotOffset);
             }
 
             if (!renderer.xr.isPresenting) {
