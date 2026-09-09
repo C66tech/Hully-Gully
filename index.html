@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.6.0</title>
+    <title>Hully Gully WebXR Simulator v2.7.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.6.0
+                v2.7.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore 12m - World Scale & Car Camera +90° CCW</p>
+        <p class="text-xs text-slate-500 mb-4">Cilindro Trasparente 10m & Scenario Sfondo.png</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -79,7 +79,7 @@
 
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
-            <p>• Stick SX (Oriz): VDISCO | (Vert): <strong>Scala del Mondo</strong></p>
+            <p>• Stick SX (Oriz): VDISCO | (Vert): Scala del Mondo</p>
             <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
             <p>• Tasto A/X (Sinistro): Vista Carrozza (+90° CCW)</p>
             <p>• Tasto A (Destro): Aggancio / Sgancio 1:1 (3s)</p>
@@ -95,7 +95,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.6.0";
+        const GAME_VERSION = "v2.7.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -138,7 +138,6 @@
             scene.background = new THREE.Color(0xe2e8f0);
             scene.fog = new THREE.FogExp2(0xe2e8f0, 0.01);
 
-            // Gruppo del Mondo (per la scala globale VR)
             worldGroup = new THREE.Group();
             scene.add(worldGroup);
 
@@ -212,8 +211,43 @@
         }
 
         function createEnvironment() {
-            // Torri Faro (Altezza 6m, pali sottili) all'interno di worldGroup
-            const lightTowerRadius = 12.0;
+            const platformRadius = 10.0; // Stesso raggio della piattaforma
+            const cylinderHeight = 10.0; // Altezza 10 metri
+
+            // Cilindro Trasparente Principale (360 gradi)
+            const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
+            const transparentCylMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.1,
+                side: THREE.DoubleSide,
+                roughness: 0.1
+            });
+            const transparentCyl = new THREE.Mesh(transparentCylGeo, transparentCylMat);
+            transparentCyl.position.y = cylinderHeight / 2 - 0.6;
+            worldGroup.add(transparentCyl);
+
+            // Semicilindro Posteriore per lo Scenario Sfondo.png
+            const textureLoader = new THREE.TextureLoader();
+            const sfondoTex = textureLoader.load('Sfondo.png', 
+                (texture) => { texture.colorSpace = THREE.SRGBColorSpace; },
+                undefined,
+                () => { console.warn('Sfondo.png non trovato nella root.'); }
+            );
+
+            const backCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 32, 1, true, 0, Math.PI);
+            const backCylMat = new THREE.MeshBasicMaterial({
+                map: sfondoTex,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            const backCyl = new THREE.Mesh(backCylGeo, backCylMat);
+            backCyl.position.y = cylinderHeight / 2 - 0.6;
+            backCyl.rotation.y = Math.PI / 2; // Orientato sulla parte posteriore
+            worldGroup.add(backCyl);
+
+            // Torri Faro (Altezza 6m, pali sottili)
+            const lightTowerRadius = 8.5; // All'interno del cilindro da 10m
             const lightTowerHeight = 6.0;
             const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
 
@@ -256,8 +290,8 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Piattaforma Base Giostra (Diametro 12m -> Raggio 6m)
-            const platformGeo = new THREE.CylinderGeometry(10, 10, 0.6, 64);
+            // Piattaforma Base Giostra (Raggio 10 -> Diametro 20m)
+            const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
@@ -297,7 +331,7 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            const discRadius = 6.0; // Diametro 12m
+            const discRadius = 6.0; // Diametro 12m della giostra
             const discMesh = new THREE.Mesh(
                 new THREE.CylinderGeometry(discRadius, discRadius * 0.95, 0.4, 64),
                 new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 })
@@ -462,14 +496,12 @@
                         vDiscoVal = Math.max(0.0, Math.min(MAX_SPEED, vDiscoVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
-                    // Levetta SX Verticale -> Scala del Mondo (World Scale)
                     if (Math.abs(yAxis) > DEADZONE) {
                         let currentScale = worldGroup.scale.x;
                         currentScale = Math.max(0.1, Math.min(5.0, currentScale - yAxis * scaleRate));
                         worldGroup.scale.set(currentScale, currentScale, currentScale);
                     }
 
-                    // Tasto A / X sul controller sinistro -> Attiva/Disattiva Vista Carrozza
                     const btnCar = (buttons[3] && buttons[3].pressed) || (buttons[4] && buttons[4].pressed);
                     if (btnCar && !btnCarPressedPrev) {
                         inCarView = !inCarView;
@@ -542,14 +574,13 @@
 
             processXRControllers(delta);
 
-            // Input Tastiera PC (Fallback)
             const speedStep = 0.5 * delta;
             const angleStep = 8.0 * delta;
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
@@ -577,7 +608,6 @@
 
             updateHudTexture();
 
-            // CINEMATICA 3D GIOSTRA (SPEED_MULTIPLIER sincronizzato a 20.0)
             const SPEED_MULTIPLIER = 20.0;
             const baseRotDegPerSec = vBaseVal * SPEED_MULTIPLIER; 
             const discRotDegPerSec = vDiscoVal * SPEED_MULTIPLIER; 
@@ -590,7 +620,6 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // Gestione Vista Carrozza (Camera On Board con rotazione +90° CCW)
             if (inCarView && carriageGroups.length > 0) {
                 const car = carriageGroups[0];
                 const carWorldPos = new THREE.Vector3();
@@ -602,7 +631,6 @@
                 cameraRig.position.y += 0.35;
                 cameraRig.quaternion.copy(carWorldQuat);
 
-                // Rotazione addizionale di 90° in senso antiorario (+Math.PI / 2 su asse Y locale)
                 const rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
                 cameraRig.quaternion.multiply(rotOffset);
             }
