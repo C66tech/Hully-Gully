@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulatore 3D Hully Gully / Calypso - 4 Torri Faro a 15m</title>
-    <!-- Tailwind CSS -->
+    <title>Hully Gully WebXR Simulator v1.1.0</title>
+    
+    <!-- Librerie CSS & WebXR -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js e OrbitControls -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0d0f17; font-family: sans-serif; }
-        canvas { display: block; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        .a-enter-vr { display: none !important; }
         kbd {
             background-color: #1e293b;
             border: 1px solid #475569;
@@ -19,336 +20,213 @@
             padding: 0.15rem 0.4rem;
             font-size: 0.7rem;
             font-family: monospace;
-            box-shadow: 0 2px 0 #0f172a;
         }
     </style>
 </head>
-<body class="select-none text-white">
+<body class="bg-slate-950 text-white select-none">
 
-    <!-- Interfaccia di Controllo -->
-    <div class="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md p-5 rounded-2xl border border-slate-700/60 shadow-2xl max-w-sm w-full">
-        <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-fuchsia-500 bg-clip-text text-transparent mb-1">
-            HULLY GULLY 3D
-        </h1>
-        <p class="text-xs text-slate-400 mb-4">4 Torri Faro a 15m di altezza</p>
+    <!-- OVERLAY UI CONTROLLI 2D -->
+    <div id="ui-container" class="absolute top-4 left-4 z-50 bg-slate-900/90 backdrop-blur-md p-5 rounded-2xl border border-slate-700/60 shadow-2xl max-w-sm w-full transition-opacity duration-300">
+        <div class="flex items-center justify-between mb-1">
+            <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-fuchsia-500 bg-clip-text text-transparent">
+                HULLY GULLY WebXR
+            </h1>
+            <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
+                v1.1.0
+            </span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D / VR / AR</p>
+
+        <!-- Bottoni Selezione Modalità WebXR -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <button id="btnVR" onclick="enterXR('vr')" class="py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-xs rounded-xl shadow-lg border border-purple-400/30 transition flex items-center justify-center space-x-2">
+                <span>&#129504;</span>
+                <span>Avvia VR</span>
+            </button>
+            <button id="btnAR" onclick="enterXR('ar')" class="py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg border border-teal-400/30 transition flex items-center justify-center space-x-2">
+                <span>&#128083;</span>
+                <span>Avvia AR</span>
+            </button>
+        </div>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 border border-slate-700">
             <span id="badgeText">&#128275; Stato: Sganciato</span>
         </div>
 
-        <!-- Indicatori Valori -->
-        <div class="space-y-3 text-xs mb-5">
-            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-                <div class="flex items-center space-x-2">
-                    <span class="font-semibold text-slate-200">Velocità BASE</span>
-                    <span><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span>
-                </div>
-                <span id="valVBase" class="text-fuchsia-400 font-mono text-sm font-bold">0.00</span>
+        <!-- Valori Correnti -->
+        <div class="space-y-2.5 text-xs mb-4">
+            <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                <span class="text-slate-300">Velocità BASE</span>
+                <span id="valVBase" class="text-fuchsia-400 font-mono font-bold">0.00</span>
             </div>
-
-            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-                <div class="flex items-center space-x-2">
-                    <span class="font-semibold text-slate-200">Velocità DISCO</span>
-                    <span><kbd>Z</kbd> <kbd>X</kbd></span>
-                </div>
-                <span id="valVDisco" class="text-cyan-400 font-mono text-sm font-bold">0.00</span>
+            <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                <span class="text-slate-300">Velocità DISCO</span>
+                <span id="valVDisco" class="text-cyan-400 font-mono font-bold">0.00</span>
             </div>
-
-            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
-                <div class="flex items-center space-x-2">
-                    <span class="font-semibold text-slate-200">Angolo BRACCIO (Max 22&deg;)</span>
-                    <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span>
-                </div>
-                <span id="valAng" class="text-amber-400 font-mono text-sm font-bold">0.0&deg;</span>
+            <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
+                <span class="text-slate-300">Angolo BRACCIO</span>
+                <span id="valAng" class="text-amber-400 font-mono font-bold">0.0&deg;</span>
             </div>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-400 space-y-1.5">
-            <p><kbd>Spazio</kbd> : Aggancia / Sgancia Dondolio</p>
-            <p>&#128433;&#65039; <strong>Trascina:</strong> Ruota inquadratura 3D</p>
-            <p>&#128434;&#65039; <strong>Scorri / Pinch:</strong> Zoom avanti / indietro</p>
+        <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
+            <p><strong>Mappatura VR:</strong></p>
+            <p>• Controller DX (Stick Orizzontale): VBASE</p>
+            <p>• Controller DX (Stick Verticale): VANG</p>
+            <p>• Controller DX (Bottone X): Aggancio</p>
+            <p>• Controller SX (Stick Orizzontale): VDISCO</p>
         </div>
     </div>
 
-    <!-- Container 3D -->
-    <div id="canvas-container" class="w-screen h-screen"></div>
+    <!-- SCENA A-FRAME / WEBXR -->
+    <a-scene 
+        webxr="optionalFeatures: hit-test, local-floor; referenceSpaceType: local-floor"
+        renderer="antialias: true; colorManagement: true; exposure: 1.0; shadowMapEnabled: true"
+        embedded
+        class="w-full h-screen">
 
+        <!-- AMBIENTE & LUCI -->
+        <a-sky id="skyBox" color="#0d0f17"></a-sky>
+        <a-entity light="type: ambient; color: #ffffff; intensity: 0.3"></a-entity>
+
+        <!-- 4 TORRI FARO A 12M D'ALTEZZA OGNI 90° -->
+        <a-entity position="0 0 -12">
+            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
+            <a-sphere radius="0.3" position="0 12 0" color="#00f0ff" material="shader: flat"></a-sphere>
+            <a-entity light="type: spot; color: #00f0ff; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 0 0"></a-entity>
+        </a-entity>
+
+        <a-entity position="12 0 0">
+            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
+            <a-sphere radius="0.3" position="0 12 0" color="#ff0077" material="shader: flat"></a-sphere>
+            <a-entity light="type: spot; color: #ff0077; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 90 0"></a-entity>
+        </a-entity>
+
+        <a-entity position="0 0 12">
+            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
+            <a-sphere radius="0.3" position="0 12 0" color="#00ff88" material="shader: flat"></a-sphere>
+            <a-entity light="type: spot; color: #00ff88; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 180 0"></a-entity>
+        </a-entity>
+
+        <a-entity position="-12 0 0">
+            <a-cylinder radius="0.12" height="12" position="0 6 0" color="#334155" material="metalness: 0.8; roughness: 0.2"></a-cylinder>
+            <a-sphere radius="0.3" position="0 12 0" color="#ffcc00" material="shader: flat"></a-sphere>
+            <a-entity light="type: spot; color: #ffcc00; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 -90 0"></a-entity>
+        </a-entity>
+
+        <!-- GRIGLIA & PIATTAFORMA BASE (Y = 0) -->
+        <a-grid id="groundGrid" position="0 -0.61 0" grid="color: #334155; width: 70; height: 70"></a-grid>
+        <a-cylinder id="mainPlatform" radius="10" height="0.6" position="0 -0.3 0" color="#64748b" material="roughness: 0.6; metalness: 0.2" shadow="receive: true"></a-cylinder>
+        <a-cylinder id="wellBottom" radius="3.3" height="0.2" position="0 -0.7 0" color="#1e293b"></a-cylinder>
+
+        <!-- STRUTTURA DINAMICA GIOSTRA -->
+        <a-entity id="baseBeamGroup" position="0 -0.3 0">
+            <a-box width="6.0" height="0.4" depth="0.8" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
+            <a-cylinder radius="0.35" height="0.8" color="#0f172a" material="metalness: 0.9"></a-cylinder>
+
+            <a-entity id="armPivotGroup" position="3.0 0.2 0">
+                <a-cylinder radius="0.25" height="0.6" color="#1e293b" material="metalness: 0.9"></a-cylinder>
+                <a-box id="armMesh" width="6.0" height="0.4" depth="0.8" position="-3.0 0.2 0" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
+
+                <a-entity id="discPivotGroup" position="-6.0 0.2 0">
+                    <a-cylinder radius="0.3" height="0.6" color="#334155" material="metalness: 0.9"></a-cylinder>
+                    
+                    <a-entity id="discGroup">
+                        <a-cylinder radius="6.0" height="0.4" position="0 0.3 0" color="#1e1b4b" material="roughness: 0.3" shadow="cast: true; receive: true"></a-cylinder>
+                        <a-cone radius-bottom="1.5" radius-top="0" height="1.0" position="0 0.9 0" color="#0ea5e9" material="metalness: 0.5"></a-cone>
+                    </a-entity>
+                </a-entity>
+            </a-entity>
+        </a-entity>
+
+        <!-- RIG CAMERA & CONTROLLER WEBXR -->
+        <a-entity id="rig" position="0 0 25">
+            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: false"></a-camera>
+            <a-entity id="leftController" oculus-touch-controls="hand: left"></a-entity>
+            <a-entity id="rightController" oculus-touch-controls="hand: right"></a-entity>
+        </a-entity>
+
+    </a-scene>
+
+    <!-- LOGICA JS VANILLA E CINEMATICA -->
     <script>
-        // Setup Scena Three.js
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x0d0f17, 0.015);
+        const GAME_VERSION = "1.1.0";
+        console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 22, 36);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
-
-        // OrbitControls per Zoom e Rotazione
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.02;
-        controls.minDistance = 5;
-        controls.maxDistance = 100;
-        controls.target.set(0, 3, 0);
-
-        // Luce Ambientale
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-        scene.add(ambientLight);
-
-        // -------------------------------------------------------------
-        // 1. PIATTAFORMA CON FORO PASSANTE CIRCULARE (Diametro 6.6m)
-        // -------------------------------------------------------------
-        const platformOuterRadius = 10;
-        const holeRadius = 3.3; // Diametro = 6.6m
-        const platformThickness = 0.6;
-
-        const platformShape = new THREE.Shape();
-        platformShape.absarc(0, 0, platformOuterRadius, 0, Math.PI * 2, false);
-
-        const holePath = new THREE.Path();
-        holePath.absarc(0, 0, holeRadius, 0, Math.PI * 2, true);
-        platformShape.holes.push(holePath);
-
-        const extrudeSettings = {
-            depth: platformThickness,
-            bevelEnabled: true,
-            bevelSegments: 3,
-            steps: 1,
-            bevelSize: 0.05,
-            bevelThickness: 0.05,
-            curveSegments: 64
-        };
-
-        const platformGeo = new THREE.ExtrudeGeometry(platformShape, extrudeSettings);
-        platformGeo.rotateX(Math.PI / 2);
-
-        const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
-        const platform = new THREE.Mesh(platformGeo, platformMat);
-        platform.position.y = 0.0;
-        platform.receiveShadow = true;
-        scene.add(platform);
-
-        // Griglia sotto la piattaforma
-        const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x334155);
-        grid.position.y = -platformThickness - 0.01;
-        scene.add(grid);
-
-        // Fondo del pozzetto / Vano meccanico inferiore
-        const wellBottomGeo = new THREE.CylinderGeometry(holeRadius, holeRadius, 0.2, 48);
-        const wellBottomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-        const wellBottom = new THREE.Mesh(wellBottomGeo, wellBottomMat);
-        wellBottom.position.y = -platformThickness - 0.1;
-        scene.add(wellBottom);
-
-        // -------------------------------------------------------------
-        // 2. 4 TORRI FARO A 15M DI ALTEZZA OGNI 90 GRADI
-        // -------------------------------------------------------------
-        const lightTowerRadius = 12.0; // Posizionate poco fuori dal raggio della piattaforma
-        const lightTowerHeight = 15.0; // Altezza 15 metri
-        const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00]; // Tinte colorate fari
-
-        for (let i = 0; i < 4; i++) {
-            const angle = (i * Math.PI) / 2; // 0, 90, 180, 270 gradi
-            const posX = Math.sin(angle) * lightTowerRadius;
-            const posZ = Math.cos(angle) * lightTowerRadius;
-
-            // Gruppo Torre Faro
-            const towerGroup = new THREE.Group();
-            towerGroup.position.set(posX, 0, posZ);
-
-            // Palo / Traliccio metallico
-            const poleGeo = new THREE.CylinderGeometry(0.12, 0.25, lightTowerHeight, 16);
-            const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-            const pole = new THREE.Mesh(poleGeo, poleMat);
-            pole.position.y = lightTowerHeight / 2;
-            pole.castShadow = true;
-            towerGroup.add(pole);
-
-            // Parabola Faro superiore
-            const lampGeo = new THREE.CylinderGeometry(0.5, 0.2, 0.6, 16);
-            const lampMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 });
-            const lamp = new THREE.Mesh(lampGeo, lampMat);
-            lamp.position.y = lightTowerHeight;
-            // Inclinazione verso il centro della giostra
-            lamp.rotation.z = Math.PI / 2;
-            lamp.lookAt(0, 2, 0);
-            towerGroup.add(lamp);
-
-            // Lampadina interna brillante
-            const bulbGeo = new THREE.SphereGeometry(0.25, 16, 16);
-            const bulbMat = new THREE.MeshBasicMaterial({ color: towerColors[i] });
-            const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-            bulb.position.set(posX, lightTowerHeight, posZ);
-            scene.add(bulb);
-
-            // Faretto Orientato (`SpotLight`)
-            const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 60, Math.PI / 3, 0.4, 1);
-            spotLight.position.set(posX, lightTowerHeight, posZ);
-            spotLight.target.position.set(0, 1, 0); // Punta verso il centro della giostra
-            spotLight.castShadow = true;
-            spotLight.shadow.mapSize.width = 1024;
-            spotLight.shadow.mapSize.height = 1024;
-            scene.add(spotLight);
-            scene.add(spotLight.target);
-
-            scene.add(towerGroup);
-        }
-
-        // -------------------------------------------------------------
-        // 3. TRAVE BASE (Incassata nel foro passante)
-        // -------------------------------------------------------------
-        const baseBeamGroup = new THREE.Group();
-        baseBeamGroup.position.y = -0.3;
-        scene.add(baseBeamGroup);
-
-        const baseBeamLength = 6.0;
-        const armLength = 6.0;
-        const beamMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
-
-        const baseBeamMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(baseBeamLength, 0.4, 0.8),
-            beamMat
-        );
-        baseBeamMesh.castShadow = true;
-        baseBeamGroup.add(baseBeamMesh);
-
-        // Perno Centrale
-        const centerPin = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.35, 0.35, 0.8, 24),
-            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
-        );
-        baseBeamGroup.add(centerPin);
-
-        // -------------------------------------------------------------
-        // 4. TRAVE BRACCIO (Cerniera all'estremo destro)
-        // -------------------------------------------------------------
-        const armPivotGroup = new THREE.Group();
-        armPivotGroup.position.set(baseBeamLength / 2, 0.2, 0);
-        baseBeamGroup.add(armPivotGroup);
-
-        const hingePin = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.25, 0.25, 0.6, 16),
-            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
-        );
-        armPivotGroup.add(hingePin);
-
-        const armMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(armLength, 0.4, 0.8),
-            beamMat
-        );
-        armMesh.position.set(-armLength / 2, 0.2, 0);
-        armMesh.castShadow = true;
-        armPivotGroup.add(armMesh);
-
-        // -------------------------------------------------------------
-        // 5. DISCO GIOSTRA (Raggio 6m, a 20cm dalla piattaforma)
-        // -------------------------------------------------------------
-        const discPivotGroup = new THREE.Group();
-        discPivotGroup.position.set(-armLength, 0.2, 0);
-        armPivotGroup.add(discPivotGroup);
-
-        const discPin = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16),
-            new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 })
-        );
-        discPivotGroup.add(discPin);
-
-        const discGroup = new THREE.Group();
-        discPivotGroup.add(discGroup);
-
-        const discRadius = 6;
-        const discThickness = 0.4;
-        const discGeo = new THREE.CylinderGeometry(discRadius, discRadius * 0.95, discThickness, 64);
-        const discMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 });
-        const discMesh = new THREE.Mesh(discGeo, discMat);
-        discMesh.position.y = 0.30; 
-        discMesh.castShadow = true;
-        discMesh.receiveShadow = true;
-        discGroup.add(discMesh);
-
-        // Cono Centrale
-        const centerCone = new THREE.Mesh(
-            new THREE.ConeGeometry(1.5, 1, 24),
-            new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.5 })
-        );
-        centerCone.position.y = 0.9;
-        discGroup.add(centerCone);
-
-        // -------------------------------------------------------------
-        // 6. DIVANETTI RADIALI (16 Carrozze)
-        // -------------------------------------------------------------
-        const numCars = 16;
-        const carRadius = discRadius - 0.5;
-
-        for (let i = 0; i < numCars; i++) {
-            const angle = (i / numCars) * Math.PI * 2;
-            const carGroup = new THREE.Group();
-
-            const bodyGeo = new THREE.BoxGeometry(1.0, 0.5, 1.8);
-            const bodyMat = new THREE.MeshStandardMaterial({ 
-                color: i % 2 === 0 ? 0xf43f5e : 0x0ea5e9, 
-                roughness: 0.2, 
-                metalness: 0.3 
-            });
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 0.4;
-            body.castShadow = true;
-            carGroup.add(body);
-
-            const seat = new THREE.Mesh(
-                new THREE.BoxGeometry(0.7, 0.3, 1.4),
-                new THREE.MeshStandardMaterial({ color: 0x0f172a })
-            );
-            seat.position.set(-0.1, 0.5, 0);
-            carGroup.add(seat);
-
-            carGroup.position.set(Math.sin(angle) * carRadius, 0.3, Math.cos(angle) * carRadius);
-            carGroup.rotation.y = angle;
-
-            discGroup.add(carGroup);
-        }
-
-        // -------------------------------------------------------------
-        // 7. RAGGI LUMINOSI (16 Raggi negli spazi tra carrozze)
-        // -------------------------------------------------------------
-        const numSpokes = 16; 
-        const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
-        const halfStepAngle = (Math.PI * 2 / numCars) / 2;
-
-        for (let i = 0; i < numSpokes; i++) {
-            const angle = (i / numSpokes) * Math.PI * 2 + halfStepAngle;
-            
-            const spokeGeo = new THREE.BoxGeometry(0.12, 0.05, discRadius - 0.6);
-            const spokeMat = new THREE.MeshBasicMaterial({ color: spokeColors[i % 3] });
-            const spoke = new THREE.Mesh(spokeGeo, spokeMat);
-            
-            spoke.position.set(
-                Math.sin(angle) * (discRadius / 2),
-                0.52,
-                Math.cos(angle) * (discRadius / 2)
-            );
-            spoke.rotation.y = angle;
-            discGroup.add(spoke);
-        }
-
-        // -------------------------------------------------------------
-        // STATO E CONTROLLI TASTIERA
-        // -------------------------------------------------------------
-        const badgeStatus = document.getElementById('badgeStatus');
-        const badgeText = document.getElementById('badgeText');
+        const discGroup = document.getElementById('discGroup');
+        const baseBeamGroup = document.getElementById('baseBeamGroup');
+        const armPivotGroup = document.getElementById('armPivotGroup');
+        const skyBox = document.getElementById('skyBox');
+        const groundGrid = document.getElementById('groundGrid');
+        const uiContainer = document.getElementById('ui-container');
 
         const valVBase = document.getElementById('valVBase');
         const valVDisco = document.getElementById('valVDisco');
         const valAng = document.getElementById('valAng');
+        const badgeStatus = document.getElementById('badgeStatus');
+        const badgeText = document.getElementById('badgeText');
 
+        const numCars = 16;
+        const discRadius = 6.0;
+        const spokeColors = ['#00f0ff', '#ff0077', '#ffcc00'];
+        const halfStepAngle = (Math.PI * 2 / numCars) / 2;
+
+        // Inizializzazione Carrozze e Raggi
+        window.addEventListener('load', () => {
+            const discEl = discGroup;
+
+            for (let i = 0; i < numCars; i++) {
+                const angle = (i / numCars) * Math.PI * 2;
+                const carRadius = discRadius - 0.5;
+                const posX = Math.sin(angle) * carRadius;
+                const posZ = Math.cos(angle) * carRadius;
+                const rotY = (angle * 180 / Math.PI);
+
+                const carGroup = document.createElement('a-entity');
+                carGroup.setAttribute('position', `${posX} 0.3 ${posZ}`);
+                carGroup.setAttribute('rotation', `0 ${rotY} 0`);
+
+                const bodyColor = i % 2 === 0 ? '#f43f5e' : '#0ea5e9';
+                
+                const body = document.createElement('a-box');
+                body.setAttribute('width', '1.0');
+                body.setAttribute('height', '0.5');
+                body.setAttribute('depth', '1.8');
+                body.setAttribute('position', '0 0.4 0');
+                body.setAttribute('color', bodyColor);
+                body.setAttribute('shadow', 'cast: true');
+                carGroup.appendChild(body);
+
+                const seat = document.createElement('a-box');
+                seat.setAttribute('width', '0.7');
+                seat.setAttribute('height', '0.3');
+                seat.setAttribute('depth', '1.4');
+                seat.setAttribute('position', '-0.1 0.5 0');
+                seat.setAttribute('color', '#0f172a');
+                carGroup.appendChild(seat);
+
+                discEl.appendChild(carGroup);
+
+                const spokeAngle = angle + halfStepAngle;
+                const spokeX = Math.sin(spokeAngle) * (discRadius / 2);
+                const spokeZ = Math.cos(spokeAngle) * (discRadius / 2);
+                const spokeRotY = (spokeAngle * 180 / Math.PI);
+
+                const spoke = document.createElement('a-box');
+                spoke.setAttribute('width', '0.12');
+                spoke.setAttribute('height', '0.05');
+                spoke.setAttribute('depth', `${discRadius - 0.6}`);
+                spoke.setAttribute('position', `${spokeX} 0.52 ${spokeZ}`);
+                spoke.setAttribute('rotation', `0 ${spokeRotY} 0`);
+                spoke.setAttribute('color', spokeColors[i % 3]);
+                spoke.setAttribute('material', 'shader: flat');
+
+                discEl.appendChild(spoke);
+            }
+        });
+
+        // Parametri Meccanica & Input VR
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
@@ -361,10 +239,9 @@
 
         const keysPressed = {};
 
+        // Input Tastiera PC
         window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            keysPressed[key] = true;
-
+            keysPressed[e.key.toLowerCase()] = true;
             if (e.code === 'Space') {
                 e.preventDefault();
                 toggleLock();
@@ -372,54 +249,101 @@
         });
 
         window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            keysPressed[key] = false;
+            keysPressed[e.key.toLowerCase()] = false;
         });
-
-        function setLockedStateUI() {
-            badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl shadow-lg border border-emerald-500/40 flex items-center justify-center space-x-2";
-            badgeText.innerHTML = '&#128279; Stato: Agganciato (1:1)';
-        }
 
         function toggleLock() {
             isLocked = !isLocked;
-
             if (isLocked) {
                 if (Math.abs(vBaseVal - vDiscoVal) < 0.005) {
                     vDiscoVal = vBaseVal;
                     isTransitioning = false;
-                    setLockedStateUI();
+                    setLockedUI();
                 } else {
                     isTransitioning = true;
                     transitionStartTime = performance.now();
                     startVDisco = vDiscoVal;
-
-                    badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-amber-500/20 text-amber-300 font-semibold text-xs rounded-xl shadow-lg border border-amber-500/40 flex items-center justify-center space-x-2";
+                    badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-amber-500/20 text-amber-300 font-semibold text-xs rounded-xl border border-amber-500/40 flex items-center justify-center space-x-2";
                 }
             } else {
                 isTransitioning = false;
-                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg border border-slate-700 flex items-center justify-center space-x-2";
+                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl border border-slate-700 flex items-center justify-center space-x-2";
                 badgeText.innerHTML = '&#128275; Stato: Sganciato';
             }
+        }
+
+        function setLockedUI() {
+            badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl border border-emerald-500/40 flex items-center justify-center space-x-2";
+            badgeText.innerHTML = '&#128279; Stato: Agganciato (1:1)';
         }
 
         function easeInOutSine(x) {
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        let baseAngle = 0;
-        let lastFrameTime = performance.now();
+        // BINDING EVENTI CONTROLLER VR
+        const rightController = document.getElementById('rightController');
+        rightController.addEventListener('xbuttondown', () => {
+            toggleLock();
+        });
 
-        function animate(currentTime) {
-            requestAnimationFrame(animate);
+        // POLLING GAMEPAD WEBXR PER LEVETTE ANALOGICHE
+        function processVRControllers(deltaTime) {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const speedStep = 0.8 * deltaTime;
+            const angleStep = 12.0 * deltaTime;
 
-            const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.1);
-            lastFrameTime = currentTime;
+            for (const gp of gamepads) {
+                if (!gp || !gp.axes) continue;
 
-            const speedStep = 0.35 * deltaTime; 
-            const angleStep = 8.0 * deltaTime;   
+                // Controller Destro (Hand === "right")
+                if (gp.hand === 'right') {
+                    const stickX = gp.axes[2] || gp.axes[0] || 0; // Orizzontale
+                    const stickY = gp.axes[3] || gp.axes[1] || 0; // Verticale
 
-            // FRECCE SINISTRA / DESTRA -> VBASE
+                    // Levetta DX Sinistra/Destra -> VBASE
+                    if (Math.abs(stickX) > 0.15) {
+                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + stickX * speedStep));
+                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+                    }
+
+                    // Levetta DX Su/Giù -> VANG (Nota: Inversione Y per convenzione levetta)
+                    if (Math.abs(stickY) > 0.15) {
+                        angVal = Math.max(0.0, Math.min(22.0, angVal - stickY * angleStep));
+                    }
+                }
+
+                // Controller Sinistro (Hand === "left")
+                if (gp.hand === 'left') {
+                    const stickX = gp.axes[2] || gp.axes[0] || 0; // Orizzontale
+
+                    // Levetta SX Sinistra/Destra -> VDISCO
+                    if (Math.abs(stickX) > 0.15) {
+                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + stickX * speedStep));
+                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+                    }
+                }
+            }
+        }
+
+        // Loop di Animazione / Cinematica
+        let baseAngleDeg = 0;
+        let discAngleDeg = 0;
+        let lastTime = performance.now();
+
+        function tick(currentTime) {
+            requestAnimationFrame(tick);
+
+            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
+            lastTime = currentTime;
+
+            // Elabora Input Controller VR
+            processVRControllers(deltaTime);
+
+            // Elabora Input Tastiera PC
+            const speedStep = 0.35 * deltaTime;
+            const angleStep = 8.0 * deltaTime;
+
             if (keysPressed['arrowleft']) {
                 vBaseVal = Math.max(0.0, vBaseVal - speedStep);
                 if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
@@ -428,8 +352,6 @@
                 vBaseVal = Math.min(3.0, vBaseVal + speedStep);
                 if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
             }
-
-            // TASTI Z / X -> VDISCO
             if (keysPressed['z']) {
                 vDiscoVal = Math.max(0.0, vDiscoVal - speedStep);
                 if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
@@ -438,8 +360,6 @@
                 vDiscoVal = Math.min(3.0, vDiscoVal + speedStep);
                 if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
             }
-
-            // FRECCE SU / GIÙ -> ANGOLO (Max 22°)
             if (keysPressed['arrowup']) {
                 angVal = Math.min(22.0, angVal + angleStep);
             }
@@ -447,54 +367,59 @@
                 angVal = Math.max(0.0, angVal - angleStep);
             }
 
-            // Transizione con Countdown per l'Aggancio (3s)
+            // Transizione Aggancio
             if (isLocked && isTransitioning) {
-                const elapsedTime = currentTime - transitionStartTime;
-                const rawProgress = Math.min(elapsedTime / TRANSITION_DURATION, 1.0);
-                const easedProgress = easeInOutSine(rawProgress);
+                const elapsed = currentTime - transitionStartTime;
+                const progress = Math.min(elapsed / TRANSITION_DURATION, 1.0);
+                badgeText.innerHTML = `&#9203; Aggancio in corso: ${Math.max(0, (TRANSITION_DURATION - elapsed) / 1000).toFixed(1)}s`;
+                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easeInOutSine(progress);
 
-                const remainingTime = Math.max(0, (TRANSITION_DURATION - elapsedTime) / 1000);
-                badgeText.innerHTML = `&#9203; Aggancio in corso: ${remainingTime.toFixed(1)}s`;
-
-                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easedProgress;
-
-                if (rawProgress >= 1.0) {
+                if (progress >= 1.0) {
                     isTransitioning = false;
                     vDiscoVal = vBaseVal;
-                    setLockedStateUI();
+                    setLockedUI();
                 }
             }
 
-            // Aggiornamento Interfaccia
+            // Aggiornamento UI DOM
             valVBase.textContent = vBaseVal.toFixed(2);
             valVDisco.textContent = vDiscoVal.toFixed(2);
             valAng.textContent = angVal.toFixed(1) + '°';
 
-            // Calcolo Cinematica 3D
-            const vBaseSpeed = vBaseVal * 0.02;
-            const vDiscoSpeed = vDiscoVal * 0.02;
-            const angRad = (angVal * Math.PI) / 180;
+            // Trasformazioni 3D A-Frame
+            baseAngleDeg += (vBaseVal * 20) * deltaTime * 60;
+            discAngleDeg += (vDiscoVal * 20) * deltaTime * 60;
 
-            // Rotazione Trave BASE
-            baseAngle += vBaseSpeed;
-            baseBeamGroup.rotation.y = baseAngle;
-
-            // Angolo BRACCIO (Limitato a max 22°)
-            armPivotGroup.rotation.z = -angRad;
-
-            // Rotazione Invertita DISCO
-            discGroup.rotation.y -= vDiscoSpeed;
-
-            controls.update();
-            renderer.render(scene, camera);
+            baseBeamGroup.setAttribute('rotation', `0 ${baseAngleDeg} 0`);
+            armPivotGroup.setAttribute('rotation', `0 0 ${-angVal}`);
+            discGroup.setAttribute('rotation', `0 ${-discAngleDeg} 0`);
         }
 
-        animate(performance.now());
+        requestAnimationFrame(tick);
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // Attivazione WebXR AR/VR
+        function enterXR(mode) {
+            const sceneEl = document.querySelector('a-scene');
+            
+            if (mode === 'ar') {
+                skyBox.setAttribute('visible', 'false');
+                groundGrid.setAttribute('visible', 'false');
+                sceneEl.enterVR();
+            } else {
+                skyBox.setAttribute('visible', 'true');
+                groundGrid.setAttribute('visible', 'true');
+                sceneEl.enterVR();
+            }
+        }
+
+        document.querySelector('a-scene').addEventListener('enter-vr', () => {
+            uiContainer.classList.add('opacity-0', 'pointer-events-none');
+        });
+
+        document.querySelector('a-scene').addEventListener('exit-vr', () => {
+            uiContainer.classList.remove('opacity-0', 'pointer-events-none');
+            skyBox.setAttribute('visible', 'true');
+            groundGrid.setAttribute('visible', 'true');
         });
     </script>
 </body>
