@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.4.0</title>
+    <title>Hully Gully WebXR Simulator v2.5.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.4.0
+                v2.5.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Moltiplicatori Sincronizzati</p>
+        <p class="text-xs text-slate-500 mb-4">Simulatore 12m - Camera On Board Carrozza</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -79,10 +79,11 @@
 
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
-            <p>• Stick SX (Orizzontale): VDISCO | (Verticale): ZOOM SCALA MONDO</p>
-            <p>• Stick DX (Orizzontale): VBASE | (Verticale): VANG</p>
-            <p>• Grilletto DX: Puntamento e Teletrasporto sicuro</p>
-            <p>• Tasto A / X: Aggancio / Sgancio 1:1 (3s)</p>
+            <p>• Stick SX (Oriz): VDISCO | (Vert): ZOOM SCALA MONDO</p>
+            <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
+            <p>• Tasto A/X (Sinistro): <strong>Attiva/Disattiva Vista Carrozza</strong></p>
+            <p>• Tasto A (Destro): Aggancio / Sgancio 1:1 (3s)</p>
+            <p>• Grilletto DX: Teletrasporto sicuro sul pavimento</p>
         </div>
     </div>
 
@@ -94,7 +95,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.4.0";
+        const GAME_VERSION = "v2.5.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -104,6 +105,7 @@
         let hudCanvas, hudCtx, hudTexture;
         let teleportRing;
         let teleportTargets = [];
+        let carriageGroups = [];
         let raycaster = new THREE.Raycaster();
 
         // Variabili Giostra
@@ -123,8 +125,10 @@
 
         let discGroup, baseBeamGroup, armPivotGroup;
         let btnAPressedPrev = false;
+        let btnCarPressedPrev = false;
         let triggerPressedPrev = false;
         let targetPoint = null;
+        let inCarView = false;
         const keysPressed = {};
 
         init();
@@ -324,6 +328,8 @@
                 carGroup.add(body);
                 discGroup.add(carGroup);
 
+                carriageGroups.push(carGroup); // Memorizziamo la carrozza per la vista interna
+
                 const spokeAngle = angle + halfStepAngle;
                 const spoke = new THREE.Mesh(
                     new THREE.BoxGeometry(0.12, 0.05, discRadius - 0.6),
@@ -457,6 +463,18 @@
                         currentScale = Math.max(0.2, Math.min(4.0, currentScale - yAxis * scaleRate));
                         cameraRig.scale.set(currentScale, currentScale, currentScale);
                     }
+
+                    // Tasto A / X sul controller sinistro -> Attiva/Disattiva Vista Carrozza
+                    const btnCar = (buttons[3] && buttons[3].pressed) || (buttons[4] && buttons[4].pressed);
+                    if (btnCar && !btnCarPressedPrev) {
+                        inCarView = !inCarView;
+                        if (!inCarView) {
+                            cameraRig.scale.set(1, 1, 1);
+                            cameraRig.position.set(0, 3.0, 25);
+                        }
+                    }
+                    btnCarPressedPrev = btnCar;
+
                 } else if (source.handedness === 'right') {
                     if (Math.abs(xAxis) > DEADZONE) {
                         vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
@@ -475,7 +493,7 @@
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
 
-                    if (controller) {
+                    if (controller && !inCarView) {
                         const tempMatrix = new THREE.Matrix4();
                         tempMatrix.identity().extractRotation(controller.matrixWorld);
                         
@@ -519,6 +537,7 @@
 
             processXRControllers(delta);
 
+            // Input Tastiera PC (Fallback)
             const speedStep = 0.5 * delta;
             const angleStep = 8.0 * delta;
 
@@ -553,7 +572,7 @@
 
             updateHudTexture();
 
-            // CINEMATICA SINCRONIZZATA (SPEED_MULTIPLIER uguali a 20.0 per base e disco)
+            // CINEMATICA 3D GIOSTRA (SPEED_MULTIPLIER sincronizzato a 20.0)
             const SPEED_MULTIPLIER = 20.0;
             const baseRotDegPerSec = vBaseVal * SPEED_MULTIPLIER; 
             const discRotDegPerSec = vDiscoVal * SPEED_MULTIPLIER; 
@@ -566,7 +585,23 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            controls.update();
+            // Gestione Vista Carrozza (Camera On Board)
+            if (inCarView && carriageGroups.length > 0) {
+                const car = carriageGroups[0];
+                const carWorldPos = new THREE.Vector3();
+                const carWorldQuat = new THREE.Quaternion();
+                car.getWorldPosition(carWorldPos);
+                car.getWorldQuaternion(carWorldQuat);
+
+                // Posiziona il rig dentro la carrozza (altezza sedile)
+                cameraRig.position.copy(carWorldPos);
+                cameraRig.position.y += 0.35;
+                cameraRig.quaternion.copy(carWorldQuat);
+            }
+
+            if (!renderer.xr.isPresenting) {
+                controls.update();
+            }
             renderer.render(scene, camera);
         }
     </script>
