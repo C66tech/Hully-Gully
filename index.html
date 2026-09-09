@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulatore 3D Hully Gully / Calypso - 4 Torri Faro a 15m</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js e OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0d0f17; font-family: sans-serif; }
+        canvas { display: block; }
+        kbd {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 0.375rem;
+            padding: 0.15rem 0.4rem;
+            font-size: 0.7rem;
+            font-family: monospace;
+            box-shadow: 0 2px 0 #0f172a;
+        }
+    </style>
+</head>
+<body class="select-none text-white">
+
+    <!-- Interfaccia di Controllo -->
+    <div class="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md p-5 rounded-2xl border border-slate-700/60 shadow-2xl max-w-sm w-full">
+        <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-fuchsia-500 bg-clip-text text-transparent mb-1">
+            HULLY GULLY 3D
+        </h1>
+        <p class="text-xs text-slate-400 mb-4">4 Torri Faro a 15m di altezza</p>
+
+        <!-- Badge Stato / Countdown -->
+        <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 border border-slate-700">
+            <span id="badgeText">&#128275; Stato: Sganciato</span>
+        </div>
+
+        <!-- Indicatori Valori -->
+        <div class="space-y-3 text-xs mb-5">
+            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-slate-200">Velocità BASE</span>
+                    <span><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span>
+                </div>
+                <span id="valVBase" class="text-fuchsia-400 font-mono text-sm font-bold">0.00</span>
+            </div>
+
+            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-slate-200">Velocità DISCO</span>
+                    <span><kbd>Z</kbd> <kbd>X</kbd></span>
+                </div>
+                <span id="valVDisco" class="text-cyan-400 font-mono text-sm font-bold">0.00</span>
+            </div>
+
+            <div class="flex justify-between items-center bg-slate-800/50 p-2.5 rounded-lg border border-slate-700/50">
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-slate-200">Angolo BRACCIO (Max 22&deg;)</span>
+                    <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span>
+                </div>
+                <span id="valAng" class="text-amber-400 font-mono text-sm font-bold">0.0&deg;</span>
+            </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-400 space-y-1.5">
+            <p><kbd>Spazio</kbd> : Aggancia / Sgancia Dondolio</p>
+            <p>&#128433;&#65039; <strong>Trascina:</strong> Ruota inquadratura 3D</p>
+            <p>&#128434;&#65039; <strong>Scorri / Pinch:</strong> Zoom avanti / indietro</p>
+        </div>
+    </div>
+
+    <!-- Container 3D -->
+    <div id="canvas-container" class="w-screen h-screen"></div>
+
+    <script>
+        // Setup Scena Three.js
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0d0f17, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 22, 36);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // OrbitControls per Zoom e Rotazione
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.02;
+        controls.minDistance = 5;
+        controls.maxDistance = 100;
+        controls.target.set(0, 3, 0);
+
+        // Luce Ambientale
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+
+        // -------------------------------------------------------------
+        // 1. PIATTAFORMA CON FORO PASSANTE CIRCULARE (Diametro 6.6m)
+        // -------------------------------------------------------------
+        const platformOuterRadius = 10;
+        const holeRadius = 3.3; // Diametro = 6.6m
+        const platformThickness = 0.6;
+
+        const platformShape = new THREE.Shape();
+        platformShape.absarc(0, 0, platformOuterRadius, 0, Math.PI * 2, false);
+
+        const holePath = new THREE.Path();
+        holePath.absarc(0, 0, holeRadius, 0, Math.PI * 2, true);
+        platformShape.holes.push(holePath);
+
+        const extrudeSettings = {
+            depth: platformThickness,
+            bevelEnabled: true,
+            bevelSegments: 3,
+            steps: 1,
+            bevelSize: 0.05,
+            bevelThickness: 0.05,
+            curveSegments: 64
+        };
+
+        const platformGeo = new THREE.ExtrudeGeometry(platformShape, extrudeSettings);
+        platformGeo.rotateX(Math.PI / 2);
+
+        const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
+        const platform = new THREE.Mesh(platformGeo, platformMat);
+        platform.position.y = 0.0;
+        platform.receiveShadow = true;
+        scene.add(platform);
+
+        // Griglia sotto la piattaforma
+        const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x334155);
+        grid.position.y = -platformThickness - 0.01;
+        scene.add(grid);
+
+        // Fondo del pozzetto / Vano meccanico inferiore
+        const wellBottomGeo = new THREE.CylinderGeometry(holeRadius, holeRadius, 0.2, 48);
+        const wellBottomMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+        const wellBottom = new THREE.Mesh(wellBottomGeo, wellBottomMat);
+        wellBottom.position.y = -platformThickness - 0.1;
+        scene.add(wellBottom);
+
+        // -------------------------------------------------------------
+        // 2. 4 TORRI FARO A 15M DI ALTEZZA OGNI 90 GRADI
+        // -------------------------------------------------------------
+        const lightTowerRadius = 12.0; // Posizionate poco fuori dal raggio della piattaforma
+        const lightTowerHeight = 15.0; // Altezza 15 metri
+        const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00]; // Tinte colorate fari
+
+        for (let i = 0; i < 4; i++) {
+            const angle = (i * Math.PI) / 2; // 0, 90, 180, 270 gradi
+            const posX = Math.sin(angle) * lightTowerRadius;
+            const posZ = Math.cos(angle) * lightTowerRadius;
+
+            // Gruppo Torre Faro
+            const towerGroup = new THREE.Group();
+            towerGroup.position.set(posX, 0, posZ);
+
+            // Palo / Traliccio metallico
+            const poleGeo = new THREE.CylinderGeometry(0.12, 0.25, lightTowerHeight, 16);
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.y = lightTowerHeight / 2;
+            pole.castShadow = true;
+            towerGroup.add(pole);
+
+            // Parabola Faro superiore
+            const lampGeo = new THREE.CylinderGeometry(0.5, 0.2, 0.6, 16);
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 });
+            const lamp = new THREE.Mesh(lampGeo, lampMat);
+            lamp.position.y = lightTowerHeight;
+            // Inclinazione verso il centro della giostra
+            lamp.rotation.z = Math.PI / 2;
+            lamp.lookAt(0, 2, 0);
+            towerGroup.add(lamp);
+
+            // Lampadina interna brillante
+            const bulbGeo = new THREE.SphereGeometry(0.25, 16, 16);
+            const bulbMat = new THREE.MeshBasicMaterial({ color: towerColors[i] });
+            const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+            bulb.position.set(posX, lightTowerHeight, posZ);
+            scene.add(bulb);
+
+            // Faretto Orientato (`SpotLight`)
+            const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 60, Math.PI / 3, 0.4, 1);
+            spotLight.position.set(posX, lightTowerHeight, posZ);
+            spotLight.target.position.set(0, 1, 0); // Punta verso il centro della giostra
+            spotLight.castShadow = true;
+            spotLight.shadow.mapSize.width = 1024;
+            spotLight.shadow.mapSize.height = 1024;
+            scene.add(spotLight);
+            scene.add(spotLight.target);
+
+            scene.add(towerGroup);
+        }
+
+        // -------------------------------------------------------------
+        // 3. TRAVE BASE (Incassata nel foro passante)
+        // -------------------------------------------------------------
+        const baseBeamGroup = new THREE.Group();
+        baseBeamGroup.position.y = -0.3;
+        scene.add(baseBeamGroup);
+
+        const baseBeamLength = 6.0;
+        const armLength = 6.0;
+        const beamMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 });
+
+        const baseBeamMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(baseBeamLength, 0.4, 0.8),
+            beamMat
+        );
+        baseBeamMesh.castShadow = true;
+        baseBeamGroup.add(baseBeamMesh);
+
+        // Perno Centrale
+        const centerPin = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.35, 0.35, 0.8, 24),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 })
+        );
+        baseBeamGroup.add(centerPin);
+
+        // -------------------------------------------------------------
+        // 4. TRAVE BRACCIO (Cerniera all'estremo destro)
+        // -------------------------------------------------------------
+        const armPivotGroup = new THREE.Group();
+        armPivotGroup.position.set(baseBeamLength / 2, 0.2, 0);
+        baseBeamGroup.add(armPivotGroup);
+
+        const hingePin = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.25, 0.25, 0.6, 16),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 })
+        );
+        armPivotGroup.add(hingePin);
+
+        const armMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(armLength, 0.4, 0.8),
+            beamMat
+        );
+        armMesh.position.set(-armLength / 2, 0.2, 0);
+        armMesh.castShadow = true;
+        armPivotGroup.add(armMesh);
+
+        // -------------------------------------------------------------
+        // 5. DISCO GIOSTRA (Raggio 6m, a 20cm dalla piattaforma)
+        // -------------------------------------------------------------
+        const discPivotGroup = new THREE.Group();
+        discPivotGroup.position.set(-armLength, 0.2, 0);
+        armPivotGroup.add(discPivotGroup);
+
+        const discPin = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.3, 0.6, 16),
+            new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9 })
+        );
+        discPivotGroup.add(discPin);
+
+        const discGroup = new THREE.Group();
+        discPivotGroup.add(discGroup);
+
+        const discRadius = 6;
+        const discThickness = 0.4;
+        const discGeo = new THREE.CylinderGeometry(discRadius, discRadius * 0.95, discThickness, 64);
+        const discMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 });
+        const discMesh = new THREE.Mesh(discGeo, discMat);
+        discMesh.position.y = 0.30; 
+        discMesh.castShadow = true;
+        discMesh.receiveShadow = true;
+        discGroup.add(discMesh);
+
+        // Cono Centrale
+        const centerCone = new THREE.Mesh(
+            new THREE.ConeGeometry(1.5, 1, 24),
+            new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.5 })
+        );
+        centerCone.position.y = 0.9;
+        discGroup.add(centerCone);
+
+        // -------------------------------------------------------------
+        // 6. DIVANETTI RADIALI (16 Carrozze)
+        // -------------------------------------------------------------
+        const numCars = 16;
+        const carRadius = discRadius - 0.5;
+
+        for (let i = 0; i < numCars; i++) {
+            const angle = (i / numCars) * Math.PI * 2;
+            const carGroup = new THREE.Group();
+
+            const bodyGeo = new THREE.BoxGeometry(1.0, 0.5, 1.8);
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: i % 2 === 0 ? 0xf43f5e : 0x0ea5e9, 
+                roughness: 0.2, 
+                metalness: 0.3 
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.4;
+            body.castShadow = true;
+            carGroup.add(body);
+
+            const seat = new THREE.Mesh(
+                new THREE.BoxGeometry(0.7, 0.3, 1.4),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            seat.position.set(-0.1, 0.5, 0);
+            carGroup.add(seat);
+
+            carGroup.position.set(Math.sin(angle) * carRadius, 0.3, Math.cos(angle) * carRadius);
+            carGroup.rotation.y = angle;
+
+            discGroup.add(carGroup);
+        }
+
+        // -------------------------------------------------------------
+        // 7. RAGGI LUMINOSI (16 Raggi negli spazi tra carrozze)
+        // -------------------------------------------------------------
+        const numSpokes = 16; 
+        const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
+        const halfStepAngle = (Math.PI * 2 / numCars) / 2;
+
+        for (let i = 0; i < numSpokes; i++) {
+            const angle = (i / numSpokes) * Math.PI * 2 + halfStepAngle;
+            
+            const spokeGeo = new THREE.BoxGeometry(0.12, 0.05, discRadius - 0.6);
+            const spokeMat = new THREE.MeshBasicMaterial({ color: spokeColors[i % 3] });
+            const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+            
+            spoke.position.set(
+                Math.sin(angle) * (discRadius / 2),
+                0.52,
+                Math.cos(angle) * (discRadius / 2)
+            );
+            spoke.rotation.y = angle;
+            discGroup.add(spoke);
+        }
+
+        // -------------------------------------------------------------
+        // STATO E CONTROLLI TASTIERA
+        // -------------------------------------------------------------
+        const badgeStatus = document.getElementById('badgeStatus');
+        const badgeText = document.getElementById('badgeText');
+
+        const valVBase = document.getElementById('valVBase');
+        const valVDisco = document.getElementById('valVDisco');
+        const valAng = document.getElementById('valAng');
+
+        let vBaseVal = 0.0;
+        let vDiscoVal = 0.0;
+        let angVal = 0.0;
+
+        let isLocked = false;
+        let isTransitioning = false;
+        let transitionStartTime = 0;
+        let startVDisco = 0;
+        const TRANSITION_DURATION = 3000;
+
+        const keysPressed = {};
+
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            keysPressed[key] = true;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                toggleLock();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            keysPressed[key] = false;
+        });
+
+        function setLockedStateUI() {
+            badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl shadow-lg border border-emerald-500/40 flex items-center justify-center space-x-2";
+            badgeText.innerHTML = '&#128279; Stato: Agganciato (1:1)';
+        }
+
+        function toggleLock() {
+            isLocked = !isLocked;
+
+            if (isLocked) {
+                if (Math.abs(vBaseVal - vDiscoVal) < 0.005) {
+                    vDiscoVal = vBaseVal;
+                    isTransitioning = false;
+                    setLockedStateUI();
+                } else {
+                    isTransitioning = true;
+                    transitionStartTime = performance.now();
+                    startVDisco = vDiscoVal;
+
+                    badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-amber-500/20 text-amber-300 font-semibold text-xs rounded-xl shadow-lg border border-amber-500/40 flex items-center justify-center space-x-2";
+                }
+            } else {
+                isTransitioning = false;
+                badgeStatus.className = "w-full py-2.5 px-4 mb-4 bg-slate-800 text-slate-300 font-semibold text-xs rounded-xl shadow-lg border border-slate-700 flex items-center justify-center space-x-2";
+                badgeText.innerHTML = '&#128275; Stato: Sganciato';
+            }
+        }
+
+        function easeInOutSine(x) {
+            return -(Math.cos(Math.PI * x) - 1) / 2;
+        }
+
+        let baseAngle = 0;
+        let lastFrameTime = performance.now();
+
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+
+            const deltaTime = Math.min((currentTime - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = currentTime;
+
+            const speedStep = 0.35 * deltaTime; 
+            const angleStep = 8.0 * deltaTime;   
+
+            // FRECCE SINISTRA / DESTRA -> VBASE
+            if (keysPressed['arrowleft']) {
+                vBaseVal = Math.max(0.0, vBaseVal - speedStep);
+                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+            }
+            if (keysPressed['arrowright']) {
+                vBaseVal = Math.min(3.0, vBaseVal + speedStep);
+                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+            }
+
+            // TASTI Z / X -> VDISCO
+            if (keysPressed['z']) {
+                vDiscoVal = Math.max(0.0, vDiscoVal - speedStep);
+                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+            }
+            if (keysPressed['x']) {
+                vDiscoVal = Math.min(3.0, vDiscoVal + speedStep);
+                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+            }
+
+            // FRECCE SU / GIÙ -> ANGOLO (Max 22°)
+            if (keysPressed['arrowup']) {
+                angVal = Math.min(22.0, angVal + angleStep);
+            }
+            if (keysPressed['arrowdown']) {
+                angVal = Math.max(0.0, angVal - angleStep);
+            }
+
+            // Transizione con Countdown per l'Aggancio (3s)
+            if (isLocked && isTransitioning) {
+                const elapsedTime = currentTime - transitionStartTime;
+                const rawProgress = Math.min(elapsedTime / TRANSITION_DURATION, 1.0);
+                const easedProgress = easeInOutSine(rawProgress);
+
+                const remainingTime = Math.max(0, (TRANSITION_DURATION - elapsedTime) / 1000);
+                badgeText.innerHTML = `&#9203; Aggancio in corso: ${remainingTime.toFixed(1)}s`;
+
+                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easedProgress;
+
+                if (rawProgress >= 1.0) {
+                    isTransitioning = false;
+                    vDiscoVal = vBaseVal;
+                    setLockedStateUI();
+                }
+            }
+
+            // Aggiornamento Interfaccia
+            valVBase.textContent = vBaseVal.toFixed(2);
+            valVDisco.textContent = vDiscoVal.toFixed(2);
+            valAng.textContent = angVal.toFixed(1) + '°';
+
+            // Calcolo Cinematica 3D
+            const vBaseSpeed = vBaseVal * 0.02;
+            const vDiscoSpeed = vDiscoVal * 0.02;
+            const angRad = (angVal * Math.PI) / 180;
+
+            // Rotazione Trave BASE
+            baseAngle += vBaseSpeed;
+            baseBeamGroup.rotation.y = baseAngle;
+
+            // Angolo BRACCIO (Limitato a max 22°)
+            armPivotGroup.rotation.z = -angRad;
+
+            // Rotazione Invertita DISCO
+            discGroup.rotation.y -= vDiscoSpeed;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate(performance.now());
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
