@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.2.0</title>
+    <title>Hully Gully WebXR Simulator v2.3.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.2.0
+                v2.3.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Cinematica Calibrata</p>
+        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Limite Max 5.0 & World Scale</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -64,24 +64,24 @@
         <!-- Valori Correnti -->
         <div class="space-y-2.5 text-xs mb-4">
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Velocità BASE (<kbd>&larr;</kbd><kbd>&rarr;</kbd>)</span>
+                <span class="text-slate-600">Velocità BASE (Max 5.0)</span>
                 <span id="valVBase" class="text-fuchsia-600 font-mono font-bold">0.00</span>
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Velocità DISCO (<kbd>Z</kbd><kbd>X</kbd>)</span>
+                <span class="text-slate-600">Velocità DISCO (Max 5.0)</span>
                 <span id="valVDisco" class="text-cyan-600 font-mono font-bold">0.00</span>
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Angolo BRACCIO (<kbd>&uarr;</kbd><kbd>&darr;</kbd>)</span>
+                <span class="text-slate-600">Angolo BRACCIO</span>
                 <span id="valAng" class="text-amber-600 font-mono font-bold">0.0&deg;</span>
             </div>
         </div>
 
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
-            <p>• Stick SX (Orizzontale): VDISCO | (Verticale): ZOOM</p>
+            <p>• Stick SX (Orizzontale): VDISCO | (Verticale): ZOOM SCALA MONDO</p>
             <p>• Stick DX (Orizzontale): VBASE | (Verticale): VANG</p>
-            <p>• Grilletto DX: Puntamento e Teletrasporto (Cerchio)</p>
+            <p>• Grilletto DX: Puntamento e Teletrasporto sicuro</p>
             <p>• Tasto A / X: Aggancio / Sgancio 1:1 (3s)</p>
         </div>
     </div>
@@ -94,7 +94,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.2.0";
+        const GAME_VERSION = "v2.3.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -103,12 +103,14 @@
         let hudGroup = null;
         let hudCanvas, hudCtx, hudTexture;
         let teleportRing;
+        let teleportTargets = [];
         let raycaster = new THREE.Raycaster();
 
-        // Variabili Giostra
+        // Variabili Giostra (Limite max portato a 5.0)
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
+        const MAX_SPEED = 5.0;
 
         let isLocked = false;
         let isTransitioning = false;
@@ -202,9 +204,9 @@
         }
 
         function createEnvironment() {
-            // Torri Faro (Altezza ridotta a 6m, pali sottili)
+            // Torri Faro (Altezza 6m, pali sottili)
             const lightTowerRadius = 12.0;
-            const lightTowerHeight = 6.0; // Dimezzato da 12m a 6m
+            const lightTowerHeight = 6.0;
             const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
 
             for (let i = 0; i < 4; i++) {
@@ -215,7 +217,6 @@
                 const towerGroup = new THREE.Group();
                 towerGroup.position.set(posX, 0, posZ);
 
-                // Palo molto più sottile (raggio 0.03 invece di 0.12/0.25)
                 const pole = new THREE.Mesh(
                     new THREE.CylinderGeometry(0.03, 0.03, lightTowerHeight, 16),
                     new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
@@ -223,7 +224,6 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                // Faretto posizionato alla nuova sommità (6m) ma orientato verso il centro
                 const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 40, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
@@ -241,8 +241,8 @@
             ground.rotation.x = -Math.PI / 2;
             ground.position.y = -0.62;
             ground.receiveShadow = true;
-            ground.name = "teleport-target";
             scene.add(ground);
+            teleportTargets.push(ground); // Aggiunto in modo sicuro ai target
 
             const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x64748b);
             grid.position.y = -0.61;
@@ -254,8 +254,8 @@
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
             platform.receiveShadow = true;
-            platform.name = "teleport-target";
             scene.add(platform);
+            teleportTargets.push(platform); // Aggiunto in modo sicuro ai target
 
             // Cerchio di destinazione teletrasporto
             const ringGeo = new THREE.RingGeometry(0.4, 0.6, 32);
@@ -355,8 +355,6 @@
                 const controllerGrip = renderer.xr.getControllerGrip(i);
                 const model = controllerModelFactory.createControllerModel(controllerGrip);
                 controllerGrip.add(model);
-                
-                // Ingranditi leggermente (1.3x) per non sembrare microscopici
                 controllerGrip.scale.set(1.3, 1.3, 1.3);
 
                 scene.add(controllerGrip);
@@ -431,15 +429,15 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // Elaborazione Input Controller XR
+        // Elaborazione Input Controller XR (Levette, World Scale Zoom e Teletrasporto sicuro)
         function processXRControllers(delta) {
             const session = renderer.xr.getSession();
             if (!session) return;
 
             const DEADZONE = 0.15;
-            const speedRate = 1.0 * delta;
+            const speedRate = 1.2 * delta;
             const angleRate = 10.0 * delta;
-            const zoomRate = 4.0 * delta;
+            const scaleRate = 1.5 * delta;
 
             for (const source of session.inputSources) {
                 if (!source.gamepad) continue;
@@ -450,22 +448,24 @@
                 const yAxis = axes.length > 3 ? axes[3] : (axes[1] || 0);
 
                 if (source.handedness === 'left') {
-                    // Levetta SX Orizzontale -> VDISCO
+                    // Levetta SX Orizzontale -> VDISCO (Max 5.0)
                     if (Math.abs(xAxis) > DEADZONE) {
-                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + xAxis * speedRate));
+                        vDiscoVal = Math.max(0.0, Math.min(MAX_SPEED, vDiscoVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
-                    // Levetta SX Verticale -> ZOOM
+                    // Levetta SX Verticale -> ZOOM SCALA DEL MONDO (CameraRig Scale)
                     if (Math.abs(yAxis) > DEADZONE) {
-                        camera.position.z = Math.max(5.0, Math.min(45.0, camera.position.z + yAxis * zoomRate));
+                        let currentScale = cameraRig.scale.x;
+                        currentScale = Math.max(0.2, Math.min(4.0, currentScale - yAxis * scaleRate));
+                        cameraRig.scale.set(currentScale, currentScale, currentScale);
                     }
                 } else if (source.handedness === 'right') {
-                    // Levetta DX Orizzontale -> VBASE
+                    // Levetta DX Orizzontale -> VBASE (Max 5.0)
                     if (Math.abs(xAxis) > DEADZONE) {
-                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + xAxis * speedRate));
+                        vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
                     }
-                    // Levetta DX Verticale -> VANG (Braccio)
+                    // Levetta DX Verticale -> VANG
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
@@ -477,7 +477,7 @@
                     }
                     btnAPressedPrev = btnA;
 
-                    // Grilletto -> Teletrasporto
+                    // Grilletto -> Teletrasporto sicuro con raycasting su teleportTargets
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
 
@@ -489,12 +489,11 @@
                         const rayDir = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
                         
                         raycaster.set(rayOrigin, rayDir);
-                        const targets = scene.children.filter(obj => obj.name === "teleport-target");
-                        const intersects = raycaster.intersectObjects(targets, true);
+                        const intersects = raycaster.intersectObjects(teleportTargets, false);
 
                         if (trigger) {
                             if (intersects.length > 0) {
-                                targetPoint = intersects.point;
+                                targetPoint = intersects[0].point;
                                 teleportRing.position.copy(targetPoint);
                                 teleportRing.position.y += 0.02;
                                 teleportRing.visible = true;
@@ -527,14 +526,14 @@
             // 1. Elaborazione input levette e teletrasporto VR
             processXRControllers(delta);
 
-            // 2. Input Tastiera PC (Fallback)
-            const speedStep = 0.4 * delta;
+            // 2. Input Tastiera PC (Fallback - Max 5.0)
+            const speedStep = 0.5 * delta;
             const angleStep = 8.0 * delta;
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['arrowright']) { vBaseVal = Math.min(3.0, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(3.0, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
+            if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
+            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vBaseVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
@@ -564,9 +563,9 @@
 
             updateHudTexture();
 
-            // Cinematica 3D Giostra (Velocità angolari reali ed estremamente fluide)
-            const baseRotDegPerSec = vBaseVal * 12.0; // max ~36° al secondo
-            const discRotDegPerSec = vDiscoVal * 20.0; // max ~60° al secondo
+            // Cinematica 3D Giostra (Calibrata per consentire dolcezza a bassi regimi e piena velocità fino a 5.0)
+            const baseRotDegPerSec = vBaseVal * 15.0; 
+            const discRotDegPerSec = vDiscoVal * 25.0; 
             const angRad = (angVal * Math.PI) / 180;
 
             baseAngleDeg += baseRotDegPerSec * delta;
