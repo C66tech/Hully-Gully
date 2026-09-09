@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v1.1.0</title>
+    <title>Hully Gully WebXR Simulator v1.2.0</title>
     
     <!-- Librerie CSS & WebXR -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -32,7 +32,7 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v1.1.0
+                v1.2.0
             </span>
         </div>
         <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D / VR / AR</p>
@@ -72,9 +72,10 @@
 
         <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
+            <p>• Grilletto DX: Puntamento e Teletrasporto (H = 3m)</p>
             <p>• Controller DX (Stick Orizzontale): VBASE</p>
             <p>• Controller DX (Stick Verticale): VANG</p>
-            <p>• Controller DX (Bottone X): Aggancio</p>
+            <p>• Controller DX (Bottone X/A): Aggancio</p>
             <p>• Controller SX (Stick Orizzontale): VDISCO</p>
         </div>
     </div>
@@ -115,9 +116,12 @@
             <a-entity light="type: spot; color: #ffcc00; intensity: 3; angle: 45; distance: 50; castShadow: true" position="0 12 0" rotation="-45 -90 0"></a-entity>
         </a-entity>
 
+        <!-- AREA CALPESTABILE TELETRASPORTO -->
+        <a-plane id="teleportSurface" class="teleport-target" position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
+
         <!-- GRIGLIA & PIATTAFORMA BASE (Y = 0) -->
         <a-grid id="groundGrid" position="0 -0.61 0" grid="color: #334155; width: 70; height: 70"></a-grid>
-        <a-cylinder id="mainPlatform" radius="10" height="0.6" position="0 -0.3 0" color="#64748b" material="roughness: 0.6; metalness: 0.2" shadow="receive: true"></a-cylinder>
+        <a-cylinder id="mainPlatform" class="teleport-target" radius="10" height="0.6" position="0 -0.3 0" color="#64748b" material="roughness: 0.6; metalness: 0.2" shadow="receive: true"></a-cylinder>
         <a-cylinder id="wellBottom" radius="3.3" height="0.2" position="0 -0.7 0" color="#1e293b"></a-cylinder>
 
         <!-- STRUTTURA DINAMICA GIOSTRA -->
@@ -140,18 +144,27 @@
             </a-entity>
         </a-entity>
 
+        <!-- TARGET CERCHIO PUNTAMENTO TELETRASPORTO -->
+        <a-ring id="teleportRing" radius-inner="0.4" radius-outer="0.6" color="#00ff88" rotation="-90 0 0" visible="false" material="shader: flat; opacity: 0.8"></a-ring>
+
         <!-- RIG CAMERA & CONTROLLER WEBXR -->
-        <a-entity id="rig" position="0 0 25">
+        <a-entity id="rig" position="0 3.0 25">
             <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: false"></a-camera>
-            <a-entity id="leftController" oculus-touch-controls="hand: left"></a-entity>
-            <a-entity id="rightController" oculus-touch-controls="hand: right"></a-entity>
+            
+            <!-- Controller SX -->
+            <a-entity id="leftController" oculus-touch-controls="hand: left" vr-controls-left></a-entity>
+            
+            <!-- Controller DX con Raycaster Puntamento -->
+            <a-entity id="rightController" oculus-touch-controls="hand: right" vr-controls-right
+                      raycaster="objects: .teleport-target; showLine: false; enabled: false"
+                      line="color: #00ff88; opacity: 0.7"></a-entity>
         </a-entity>
 
     </a-scene>
 
     <!-- LOGICA JS VANILLA E CINEMATICA -->
     <script>
-        const GAME_VERSION = "1.1.0";
+        const GAME_VERSION = "1.2.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const discGroup = document.getElementById('discGroup');
@@ -160,6 +173,8 @@
         const skyBox = document.getElementById('skyBox');
         const groundGrid = document.getElementById('groundGrid');
         const uiContainer = document.getElementById('ui-container');
+        const rig = document.getElementById('rig');
+        const teleportRing = document.getElementById('teleportRing');
 
         const valVBase = document.getElementById('valVBase');
         const valVDisco = document.getElementById('valVDisco');
@@ -226,7 +241,7 @@
             }
         });
 
-        // Parametri Meccanica & Input VR
+        // Parametri Meccanica
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
@@ -281,50 +296,79 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // BINDING EVENTI CONTROLLER VR
-        const rightController = document.getElementById('rightController');
-        rightController.addEventListener('xbuttondown', () => {
-            toggleLock();
+        // COMPONENTI A-FRAME CUSTOM PER CONTROLLER VR NATIVI
+        AFRAME.registerComponent('vr-controls-left', {
+            init: function () {
+                this.el.addEventListener('thumbstickmoved', (evt) => {
+                    const x = evt.detail.x;
+                    if (Math.abs(x) > 0.15) {
+                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + x * 0.03));
+                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+                    }
+                });
+            }
         });
 
-        // POLLING GAMEPAD WEBXR PER LEVETTE ANALOGICHE
-        function processVRControllers(deltaTime) {
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-            const speedStep = 0.8 * deltaTime;
-            const angleStep = 12.0 * deltaTime;
+        AFRAME.registerComponent('vr-controls-right', {
+            init: function () {
+                const el = this.el;
+                let isPointing = false;
+                let targetPoint = null;
 
-            for (const gp of gamepads) {
-                if (!gp || !gp.axes) continue;
+                // Move VBASE / VANG via Stick
+                el.addEventListener('thumbstickmoved', (evt) => {
+                    const x = evt.detail.x;
+                    const y = evt.detail.y;
 
-                // Controller Destro (Hand === "right")
-                if (gp.hand === 'right') {
-                    const stickX = gp.axes[2] || gp.axes[0] || 0; // Orizzontale
-                    const stickY = gp.axes[3] || gp.axes[1] || 0; // Verticale
-
-                    // Levetta DX Sinistra/Destra -> VBASE
-                    if (Math.abs(stickX) > 0.15) {
-                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + stickX * speedStep));
+                    if (Math.abs(x) > 0.15) {
+                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + x * 0.03));
                         if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
                     }
 
-                    // Levetta DX Su/Giù -> VANG (Nota: Inversione Y per convenzione levetta)
-                    if (Math.abs(stickY) > 0.15) {
-                        angVal = Math.max(0.0, Math.min(22.0, angVal - stickY * angleStep));
+                    if (Math.abs(y) > 0.15) {
+                        angVal = Math.max(0.0, Math.min(22.0, angVal - y * 0.4));
                     }
-                }
+                });
 
-                // Controller Sinistro (Hand === "left")
-                if (gp.hand === 'left') {
-                    const stickX = gp.axes[2] || gp.axes[0] || 0; // Orizzontale
+                // Tasto X / A -> Aggancio
+                el.addEventListener('xbuttondown', toggleLock);
+                el.addEventListener('abuttondown', toggleLock);
 
-                    // Levetta SX Sinistra/Destra -> VDISCO
-                    if (Math.abs(stickX) > 0.15) {
-                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + stickX * speedStep));
-                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+                // Grilletto -> Puntamento Teletrasporto
+                el.addEventListener('triggerdown', () => {
+                    isPointing = true;
+                    el.setAttribute('raycaster', 'enabled', true);
+                    el.setAttribute('raycaster', 'showLine', true);
+                    teleportRing.setAttribute('visible', true);
+                });
+
+                el.addEventListener('triggerup', () => {
+                    if (isPointing && targetPoint) {
+                        // Teletrasporto rig mantenendo sempre altezza Y = 3.0m
+                        rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
                     }
-                }
+                    isPointing = false;
+                    targetPoint = null;
+                    el.setAttribute('raycaster', 'enabled', false);
+                    el.setAttribute('raycaster', 'showLine', false);
+                    teleportRing.setAttribute('visible', false);
+                });
+
+                // Raycaster Intersection Tracking
+                el.addEventListener('raycaster-intersection', (evt) => {
+                    if (!isPointing) return;
+                    const intersection = evt.detail.intersections[0];
+                    if (intersection) {
+                        targetPoint = intersection.point;
+                        teleportRing.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);
+                    }
+                });
+
+                el.addEventListener('raycaster-intersection-cleared', () => {
+                    targetPoint = null;
+                });
             }
-        }
+        });
 
         // Loop di Animazione / Cinematica
         let baseAngleDeg = 0;
@@ -336,9 +380,6 @@
 
             const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
             lastTime = currentTime;
-
-            // Elabora Input Controller VR
-            processVRControllers(deltaTime);
 
             // Elabora Input Tastiera PC
             const speedStep = 0.35 * deltaTime;
