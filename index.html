@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.7.0</title>
+    <title>Hully Gully WebXR Simulator v2.9.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.7.0
+                v2.9.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Cilindro Trasparente 10m & Scenario Sfondo.png</p>
+        <p class="text-xs text-slate-500 mb-4">Piattaforma 22m - Mappatura Tasti A/B/Y</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -79,11 +79,11 @@
 
         <div class="pt-2 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
             <p><strong>Mappatura VR:</strong></p>
-            <p>• Stick SX (Oriz): VDISCO | (Vert): Scala del Mondo</p>
+            <p>• Stick SX (Oriz): VDISCO</p>
             <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
-            <p>• Tasto A/X (Sinistro): Vista Carrozza (+90° CCW)</p>
-            <p>• Tasto A (Destro): Aggancio / Sgancio 1:1 (3s)</p>
-            <p>• Grilletto DX: Teletrasporto sicuro</p>
+            <p>• Tasto Y (Sinistro): <strong>Attiva/Disattiva Vista Carrozza</strong></p>
+            <p>• Tasti A (-) e B (+): <strong>Scala del Mondo</strong> (Controller Destro)</p>
+            <p>• Grilletto DX: Teletrasporto sicuro sul pavimento</p>
         </div>
     </div>
 
@@ -95,7 +95,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.7.0";
+        const GAME_VERSION = "v2.9.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -124,7 +124,6 @@
         let discAngleDeg = 0;
 
         let discGroup, baseBeamGroup, armPivotGroup;
-        let btnAPressedPrev = false;
         let btnCarPressedPrev = false;
         let triggerPressedPrev = false;
         let targetPoint = null;
@@ -200,7 +199,7 @@
                 keysPressed[e.key.toLowerCase()] = true;
                 if (e.code === 'Space') {
                     e.preventDefault();
-                    toggleLock();
+                    // Fallback toggle lock se necessario
                 }
             });
             window.addEventListener('keyup', (e) => {
@@ -211,17 +210,16 @@
         }
 
         function createEnvironment() {
-            const platformRadius = 10.0; // Stesso raggio della piattaforma
-            const cylinderHeight = 10.0; // Altezza 10 metri
+            const platformRadius = 11.0; // Diametro 22 metri (+2m rispetto a prima)
+            const cylinderHeight = 10.0;
 
-            // Cilindro Trasparente Principale (360 gradi)
+            // Cilindro Principale Completamente Invisibile (opacity: 0.0)
             const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
             const transparentCylMat = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
                 transparent: true,
-                opacity: 0.1,
-                side: THREE.DoubleSide,
-                roughness: 0.1
+                opacity: 0.0,
+                side: THREE.DoubleSide
             });
             const transparentCyl = new THREE.Mesh(transparentCylGeo, transparentCylMat);
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
@@ -243,11 +241,11 @@
             });
             const backCyl = new THREE.Mesh(backCylGeo, backCylMat);
             backCyl.position.y = cylinderHeight / 2 - 0.6;
-            backCyl.rotation.y = Math.PI / 2; // Orientato sulla parte posteriore
+            backCyl.rotation.y = Math.PI / 2;
             worldGroup.add(backCyl);
 
-            // Torri Faro (Altezza 6m, pali sottili)
-            const lightTowerRadius = 8.5; // All'interno del cilindro da 10m
+            // Torri Faro posizionate esattamente sulla circonferenza della piattaforma (raggio 11m)
+            const lightTowerRadius = 11.0;
             const lightTowerHeight = 6.0;
             const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
 
@@ -266,7 +264,7 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 40, Math.PI / 3, 0.4, 1);
+                const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 45, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = true;
@@ -290,7 +288,7 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Piattaforma Base Giostra (Raggio 10 -> Diametro 20m)
+            // Piattaforma Base Giostra (Raggio 11 -> Diametro 22m)
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
             const platform = new THREE.Mesh(platformGeo, platformMat);
@@ -481,7 +479,7 @@
             const DEADZONE = 0.15;
             const speedRate = 1.2 * delta;
             const angleRate = 10.0 * delta;
-            const scaleRate = 1.0 * delta;
+            const scaleRate = 1.5 * delta;
 
             for (const source of session.inputSources) {
                 if (!source.gamepad) continue;
@@ -496,36 +494,41 @@
                         vDiscoVal = Math.max(0.0, Math.min(MAX_SPEED, vDiscoVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
-                    if (Math.abs(yAxis) > DEADZONE) {
-                        let currentScale = worldGroup.scale.x;
-                        currentScale = Math.max(0.1, Math.min(5.0, currentScale - yAxis * scaleRate));
-                        worldGroup.scale.set(currentScale, currentScale, currentScale);
-                    }
 
-                    const btnCar = (buttons[3] && buttons[3].pressed) || (buttons[4] && buttons[4].pressed);
-                    if (btnCar && !btnCarPressedPrev) {
+                    // Tasto Y sul controller sinistro (indice 5) -> Attiva/Disattiva Vista Carrozza
+                    const btnY = buttons[5] && buttons[5].pressed;
+                    if (btnY && !btnCarPressedPrev) {
                         inCarView = !inCarView;
                         if (!inCarView) {
                             worldGroup.scale.set(1, 1, 1);
                             cameraRig.position.set(0, 3.0, 25);
                         }
                     }
-                    btnCarPressedPrev = btnCar;
+                    btnCarPressedPrev = btnY;
 
                 } else if (source.handedness === 'right') {
                     if (Math.abs(xAxis) > DEADZONE) {
                         vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
-                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+                        if (isLocked && !isTransitioning) vDiscoVal = vDiscoVal;
                     }
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
 
-                    const btnA = buttons[4] && buttons[4].pressed;
-                    if (btnA && !btnAPressedPrev) {
-                        toggleLock();
+                    // Tasti A (indice 4) e B (indice 5) sul controller destro per Scala del Mondo (se non in vista carrozza)
+                    if (!inCarView) {
+                        const btnA = buttons[4] && buttons[4].pressed;
+                        const btnB = buttons[5] && buttons[5].pressed;
+                        let currentScale = worldGroup.scale.x;
+                        if (btnA) {
+                            currentScale = Math.max(0.1, currentScale - scaleRate);
+                            worldGroup.scale.set(currentScale, currentScale, currentScale);
+                        }
+                        if (btnB) {
+                            currentScale = Math.min(5.0, currentScale + scaleRate);
+                            worldGroup.scale.set(currentScale, currentScale, currentScale);
+                        }
                     }
-                    btnAPressedPrev = btnA;
 
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
@@ -583,24 +586,6 @@
             if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
-
-            if (isLocked && isTransitioning) {
-                const elapsedMs = currentTime - transitionStartTime;
-                const progress = Math.min(elapsedMs / TRANSITION_DURATION, 1.0);
-                const easedProgress = easeInOutSine(progress);
-
-                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easedProgress;
-
-                const remTime = Math.max(0, (TRANSITION_DURATION - elapsedMs) / 1000).toFixed(1);
-                const badgeText = document.getElementById('badgeText');
-                if (badgeText) badgeText.innerHTML = `&#9203; Aggancio in corso: ${remTime}s`;
-
-                if (progress >= 1.0) {
-                    isTransitioning = false;
-                    vDiscoVal = vBaseVal;
-                    setLockedUI();
-                }
-            }
 
             document.getElementById('valVBase').textContent = vBaseVal.toFixed(2);
             document.getElementById('valVDisco').textContent = vDiscoVal.toFixed(2);
