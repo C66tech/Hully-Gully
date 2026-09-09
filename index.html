@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v1.5.0</title>
+    <title>Hully Gully WebXR Simulator v1.6.0</title>
     
     <!-- Librerie CSS & WebXR -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -32,10 +32,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v1.5.0
+                v1.6.0
             </span>
         </div>
-        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D con HUD VR Debug</p>
+        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D - Direct WebXR Input Accumulator</p>
 
         <!-- Bottoni Selezione Modalità WebXR -->
         <div class="grid grid-cols-2 gap-3 mb-4">
@@ -71,12 +71,12 @@
         </div>
 
         <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
-            <p><strong>Mappatura VR:</strong></p>
-            <p>• Polso SX: HUD Olografico di Debug</p>
-            <p>• Stick DX (Orizzontale): VBASE</p>
-            <p>• Stick DX (Verticale): VANG (Sollevamento)</p>
-            <p>• Stick SX (Orizzontale): VDISCO</p>
-            <p>• Tasto A / X o Trigger DX: Aggancio / Teletrasporto</p>
+            <p><strong>Mappatura Accumulatore VR:</strong></p>
+            <p>• Stick DX (Sx / Dx): Aumenta / Riduce VBASE</p>
+            <p>• Stick DX (Su / Giù): Aumenta / Riduce VANG</p>
+            <p>• Stick SX (Sx / Dx): Aumenta / Riduce VDISCO</p>
+            <p>• Tasti A/B/X/Y: Aggancia / Sgancia Dondolio</p>
+            <p>• Grilletto DX: Teletrasporto (Quota H=3m)</p>
         </div>
     </div>
 
@@ -129,7 +129,7 @@
             <a-box width="6.0" height="0.4" depth="0.8" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
             <a-cylinder radius="0.35" height="0.8" color="#0f172a" material="metalness: 0.9"></a-cylinder>
 
-            <!-- Cerniera Braccio Pieghevole (Asse Z) -->
+            <!-- Cerniera Braccio Pieghevole (Inclinazione asse Z) -->
             <a-entity id="armPivotGroup" position="3.0 0.2 0">
                 <a-cylinder radius="0.25" height="0.6" color="#1e293b" material="metalness: 0.9"></a-cylinder>
                 <a-box id="armMesh" width="6.0" height="0.4" depth="0.8" position="-3.0 0.2 0" color="#0284c7" material="metalness: 0.7" shadow="cast: true"></a-box>
@@ -149,27 +149,28 @@
         <!-- TARGET CERCHIO PUNTAMENTO TELETRASPORTO -->
         <a-ring id="teleportRing" radius-inner="0.4" radius-outer="0.6" color="#00ff88" rotation="-90 0 0" visible="false" material="shader: flat; opacity: 0.8"></a-ring>
 
-        <!-- RIG CAMERA & CONTROLLER 3D CON HUD -->
+        <!-- RIG CAMERA & CONTROLLER 3D CON HUD OLOGRAFICO -->
         <a-entity id="rig" position="0 3.0 25">
             <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: false"></a-camera>
 
-            <!-- Controller SX con HUD Olografico -->
-            <a-entity id="leftController" oculus-touch-controls="hand: left" vr-controller-left>
-                <!-- PANNELLO HUD VR DEBUG (Ancorato al polso sinistro) -->
-                <a-entity id="hudVR" position="0.1 0.12 -0.15" rotation="-30 20 -10">
-                    <a-plane width="0.38" height="0.28" color="#0f172a" material="opacity: 0.9; transparent: true"></a-plane>
-                    <a-text id="hudTitle" value="HULLY GULLY DEBUG v1.5.0" position="-0.17 0.11 0.01" scale="0.18 0.18 0.18" color="#00f0ff"></a-text>
+            <!-- Controller SX -->
+            <a-entity id="leftController" oculus-touch-controls="hand: left">
+                <!-- PANNELLO HUD VR DEBUG -->
+                <a-entity id="hudVR" position="0.12 0.15 -0.2" rotation="-30 20 -10">
+                    <a-plane width="0.42" height="0.30" color="#0f172a" material="opacity: 0.9; transparent: true"></a-plane>
+                    <a-text value="HULLY GULLY DEBUG v1.6.0" position="-0.19 0.12 0.01" scale="0.18 0.18 0.18" color="#00f0ff"></a-text>
                     
-                    <a-text id="hudVBase" value="VBASE: 0.00" position="-0.17 0.06 0.01" scale="0.16 0.16 0.16" color="#f43f5e"></a-text>
-                    <a-text id="hudVDisco" value="VDISCO: 0.00" position="-0.17 0.02 0.01" scale="0.16 0.16 0.16" color="#00f0ff"></a-text>
-                    <a-text id="hudVAng" value="VANG: 0.0 deg" position="-0.17 -0.02 0.01" scale="0.16 0.16 0.16" color="#ffcc00"></a-text>
-                    <a-text id="hudStatus" value="STATO: Sganciato" position="-0.17 -0.06 0.01" scale="0.15 0.15 0.15" color="#cbd5e1"></a-text>
-                    <a-text id="hudAxes" value="AXES: L(0,0) R(0,0)" position="-0.17 -0.10 0.01" scale="0.12 0.12 0.12" color="#94a3b8"></a-text>
+                    <a-text id="hudVBase" value="VBASE: 0.00" position="-0.19 0.07 0.01" scale="0.16 0.16 0.16" color="#f43f5e"></a-text>
+                    <a-text id="hudVDisco" value="VDISCO: 0.00" position="-0.19 0.03 0.01" scale="0.16 0.16 0.16" color="#00f0ff"></a-text>
+                    <a-text id="hudVAng" value="VANG: 0.0 deg" position="-0.19 -0.01 0.01" scale="0.16 0.16 0.16" color="#ffcc00"></a-text>
+                    <a-text id="hudStatus" value="STATO: Sganciato" position="-0.19 -0.05 0.01" scale="0.15 0.15 0.15" color="#cbd5e1"></a-text>
+                    <a-text id="hudAxesL" value="STICK SX: X=0.00" position="-0.19 -0.09 0.01" scale="0.12 0.12 0.12" color="#94a3b8"></a-text>
+                    <a-text id="hudAxesR" value="STICK DX: X=0.00 Y=0.00" position="-0.19 -0.12 0.01" scale="0.12 0.12 0.12" color="#94a3b8"></a-text>
                 </a-entity>
             </a-entity>
 
-            <!-- Controller DX con Laser Puntamento -->
-            <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" vr-controller-right
+            <!-- Controller DX con Laser Teletrasporto -->
+            <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right"
                       raycaster="objects: .teleport-target; showLine: false; enabled: false"
                       line="color: #00ff88; opacity: 0.7"></a-entity>
         </a-entity>
@@ -178,7 +179,7 @@
 
     <!-- LOGICA JS VANILLA E CINEMATICA -->
     <script>
-        const GAME_VERSION = "1.5.0";
+        const GAME_VERSION = "1.6.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const discGroup = document.getElementById('discGroup');
@@ -191,26 +192,27 @@
         const teleportRing = document.getElementById('teleportRing');
         const rightController = document.getElementById('rightController');
 
-        // Elementi UI 2D
+        // UI 2D
         const valVBase = document.getElementById('valVBase');
         const valVDisco = document.getElementById('valVDisco');
         const valAng = document.getElementById('valAng');
         const badgeStatus = document.getElementById('badgeStatus');
         const badgeText = document.getElementById('badgeText');
 
-        // Elementi HUD VR
+        // HUD VR 3D
         const hudVBase = document.getElementById('hudVBase');
         const hudVDisco = document.getElementById('hudVDisco');
         const hudVAng = document.getElementById('hudVAng');
         const hudStatus = document.getElementById('hudStatus');
-        const hudAxes = document.getElementById('hudAxes');
+        const hudAxesL = document.getElementById('hudAxesL');
+        const hudAxesR = document.getElementById('hudAxesR');
 
         const numCars = 16;
         const discRadius = 6.0;
         const spokeColors = ['#00f0ff', '#ff0077', '#ffcc00'];
         const halfStepAngle = (Math.PI * 2 / numCars) / 2;
 
-        // Inizializzazione Carrozze e Raggi
+        // Inizializzazione 16 Carrozze e 16 Raggi
         window.addEventListener('load', () => {
             const discEl = discGroup;
 
@@ -275,8 +277,9 @@
         let startVDisco = 0;
         const TRANSITION_DURATION = 3000;
 
-        let stickLeftX = 0, stickRightX = 0, stickRightY = 0;
         let targetPoint = null;
+        let btnPressedPrev = false;
+        let triggerPressedPrev = false;
 
         const keysPressed = {};
 
@@ -322,67 +325,7 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // COMPONENTI EVENT-DRIVEN VR CONTROLLER
-        AFRAME.registerComponent('vr-controller-left', {
-            init: function () {
-                this.el.addEventListener('thumbstickmoved', (evt) => {
-                    stickLeftX = evt.detail.x;
-                });
-                this.el.addEventListener('xbuttondown', toggleLock);
-                this.el.addEventListener('ybuttondown', toggleLock);
-            }
-        });
-
-        AFRAME.registerComponent('vr-controller-right', {
-            init: function () {
-                const el = this.el;
-
-                this.el.addEventListener('thumbstickmoved', (evt) => {
-                    stickRightX = evt.detail.x;
-                    stickRightY = evt.detail.y;
-                });
-
-                el.addEventListener('abuttondown', toggleLock);
-                el.addEventListener('bbuttondown', toggleLock);
-
-                el.addEventListener('triggerdown', () => {
-                    el.setAttribute('raycaster', 'enabled', true);
-                    el.setAttribute('raycaster', 'showLine', true);
-                    teleportRing.setAttribute('visible', true);
-                });
-
-                el.addEventListener('triggerup', () => {
-                    if (targetPoint) {
-                        rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
-                    }
-                    targetPoint = null;
-                    el.setAttribute('raycaster', 'enabled', false);
-                    el.setAttribute('raycaster', 'showLine', false);
-                    teleportRing.setAttribute('visible', false);
-                });
-            }
-        });
-
-        // POLLING DI RETROCOMPATIBILITÀ GAMEPAD API
-        function pollGamepadData(deltaTime) {
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-            for (const gp of gamepads) {
-                if (!gp || !gp.axes) continue;
-
-                if (gp.hand === 'left') {
-                    const ax = gp.axes[2] !== undefined ? gp.axes[2] : (gp.axes[0] || 0);
-                    if (Math.abs(ax) > 0.1) stickLeftX = ax;
-                }
-                if (gp.hand === 'right') {
-                    const ax = gp.axes[2] !== undefined ? gp.axes[2] : (gp.axes[0] || 0);
-                    const ay = gp.axes[3] !== undefined ? gp.axes[3] : (gp.axes[1] || 0);
-                    if (Math.abs(ax) > 0.1) stickRightX = ax;
-                    if (Math.abs(ay) > 0.1) stickRightY = ay;
-                }
-            }
-        }
-
-        // Raycaster per teletrasporto
+        // RAYCASTER TELETRASPORTO
         rightController.addEventListener('raycaster-intersection', (evt) => {
             const intersection = evt.detail.intersections[0];
             if (intersection) {
@@ -391,7 +334,85 @@
             }
         });
 
-        // LOOP CINEMATICO E UPDATE HUD
+        // ROBUSTO POLLING GAMEPAD WEBXR CON ACCUMULATORE ANALOGICO
+        function processWebXRInputs(deltaTime) {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const DEADZONE = 0.12;
+            
+            // Sensibilità accumulatore (quanto velocemente la levetta incrementa il valore)
+            const baseRate = 1.2 * deltaTime; 
+            const angleRate = 15.0 * deltaTime;
+
+            let debugStickLX = 0;
+            let debugStickRX = 0;
+            let debugStickRY = 0;
+
+            for (const gp of gamepads) {
+                if (!gp || !gp.axes) continue;
+
+                // Controller Sinistro -> VDISCO
+                if (gp.hand === 'left') {
+                    // Controlla sia asse 2/3 (standard WebXR) che asse 0/1
+                    const rawX = Math.abs(gp.axes[2]) > DEADZONE ? gp.axes[2] : (Math.abs(gp.axes[0]) > DEADZONE ? gp.axes[0] : 0);
+                    debugStickLX = rawX;
+
+                    if (rawX !== 0) {
+                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + rawX * baseRate));
+                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+                    }
+                }
+
+                // Controller Destro -> VBASE (X) e VANG (Y)
+                if (gp.hand === 'right') {
+                    const rawX = Math.abs(gp.axes[2]) > DEADZONE ? gp.axes[2] : (Math.abs(gp.axes[0]) > DEADZONE ? gp.axes[0] : 0);
+                    const rawY = Math.abs(gp.axes[3]) > DEADZONE ? gp.axes[3] : (Math.abs(gp.axes[1]) > DEADZONE ? gp.axes[1] : 0);
+                    
+                    debugStickRX = rawX;
+                    debugStickRY = rawY;
+
+                    // Stick DX Orizzontale -> Aumenta/Riduce VBASE
+                    if (rawX !== 0) {
+                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + rawX * baseRate));
+                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+                    }
+
+                    // Stick DX Verticale -> Aumenta/Riduce VANG (Inclinazione braccio)
+                    if (rawY !== 0) {
+                        angVal = Math.max(0.0, Math.min(22.0, angVal - rawY * angleRate));
+                    }
+
+                    // Tasti A/B/X/Y (Button index 4 o 5) -> Aggancio
+                    const btnPressed = (gp.buttons[4] && gp.buttons[4].pressed) || (gp.buttons[5] && gp.buttons[5].pressed);
+                    if (btnPressed && !btnPressedPrev) {
+                        toggleLock();
+                    }
+                    btnPressedPrev = btnPressed;
+
+                    // Trigger Destro (Button 0) -> Teletrasporto
+                    const triggerPressed = gp.buttons[0] && gp.buttons[0].pressed;
+                    if (triggerPressed && !triggerPressedPrev) {
+                        rightController.setAttribute('raycaster', 'enabled', true);
+                        rightController.setAttribute('raycaster', 'showLine', true);
+                        teleportRing.setAttribute('visible', true);
+                    } else if (!triggerPressed && triggerPressedPrev) {
+                        if (targetPoint) {
+                            rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
+                        }
+                        targetPoint = null;
+                        rightController.setAttribute('raycaster', 'enabled', false);
+                        rightController.setAttribute('raycaster', 'showLine', false);
+                        teleportRing.setAttribute('visible', false);
+                    }
+                    triggerPressedPrev = triggerPressed;
+                }
+            }
+
+            // Aggiorna valori debug assi nell'HUD
+            hudAxesL.setAttribute('value', `STICK SX: X=${debugStickLX.toFixed(2)}`);
+            hudAxesR.setAttribute('value', `STICK DX: X=${debugStickRX.toFixed(2)} Y=${debugStickRY.toFixed(2)}`);
+        }
+
+        // LOOP DI ANIMAZIONE CINEMATICA
         let baseAngleDeg = 0;
         let discAngleDeg = 0;
         let lastTime = performance.now();
@@ -402,52 +423,37 @@
             const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
             lastTime = currentTime;
 
-            pollGamepadData(deltaTime);
+            // 1. Processa levetta WebXR
+            processWebXRInputs(deltaTime);
 
-            const speedStep = 0.8 * deltaTime;
-            const angleStep = 12.0 * deltaTime;
+            // 2. Processa tastiera PC
+            const speedStep = 0.35 * deltaTime;
+            const angleStep = 8.0 * deltaTime;
 
-            // 1. APPLICAZIONE INPUT STICK ANALOGICI
-            if (Math.abs(stickRightX) > 0.15) {
-                vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + stickRightX * speedStep));
-                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
-            }
-
-            if (Math.abs(stickRightY) > 0.15) {
-                // Inclinazione Braccio VANG
-                angVal = Math.max(0.0, Math.min(22.0, angVal - stickRightY * angleStep));
-            }
-
-            if (Math.abs(stickLeftX) > 0.15) {
-                vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + stickLeftX * speedStep));
-                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
-            }
-
-            // 2. APPLICAZIONE INPUT TASTIERA PC
             if (keysPressed['arrowleft']) {
-                vBaseVal = Math.max(0.0, vBaseVal - (0.35 * deltaTime));
+                vBaseVal = Math.max(0.0, vBaseVal - speedStep);
                 if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
             }
             if (keysPressed['arrowright']) {
-                vBaseVal = Math.min(3.0, vBaseVal + (0.35 * deltaTime));
+                vBaseVal = Math.min(3.0, vBaseVal + speedStep);
                 if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
             }
             if (keysPressed['z']) {
-                vDiscoVal = Math.max(0.0, vDiscoVal - (0.35 * deltaTime));
+                vDiscoVal = Math.max(0.0, vDiscoVal - speedStep);
                 if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
             }
             if (keysPressed['x']) {
-                vDiscoVal = Math.min(3.0, vDiscoVal + (0.35 * deltaTime));
+                vDiscoVal = Math.min(3.0, vDiscoVal + speedStep);
                 if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
             }
             if (keysPressed['arrowup']) {
-                angVal = Math.min(22.0, angVal + (8.0 * deltaTime));
+                angVal = Math.min(22.0, angVal + angleStep);
             }
             if (keysPressed['arrowdown']) {
-                angVal = Math.max(0.0, angVal - (8.0 * deltaTime));
+                angVal = Math.max(0.0, angVal - angleStep);
             }
 
-            // 3. TRANSIZIONE AGGANCIO (3 SECONDI)
+            // 3. Gestione Transizione Aggancio
             let statusStr = isLocked ? "Agganciato (1:1)" : "Sganciato";
             if (isLocked && isTransitioning) {
                 const elapsed = currentTime - transitionStartTime;
@@ -466,24 +472,23 @@
                 }
             }
 
-            // 4. AGGIORNAMENTO UI 2D
+            // 4. Aggiorna UI 2D
             valVBase.textContent = vBaseVal.toFixed(2);
             valVDisco.textContent = vDiscoVal.toFixed(2);
             valAng.textContent = angVal.toFixed(1) + '°';
 
-            // 5. AGGIORNAMENTO HUD VR 3D (Olografico al polso)
+            // 5. Aggiorna HUD 3D VR
             hudVBase.setAttribute('value', `VBASE: ${vBaseVal.toFixed(2)}`);
             hudVDisco.setAttribute('value', `VDISCO: ${vDiscoVal.toFixed(2)}`);
             hudVAng.setAttribute('value', `VANG: ${angVal.toFixed(1)} deg`);
             hudStatus.setAttribute('value', `STATO: ${statusStr}`);
-            hudAxes.setAttribute('value', `AXES: L(${stickLeftX.toFixed(1)}) R(${stickRightX.toFixed(1)},${stickRightY.toFixed(1)})`);
 
-            // 6. ROTAZIONE & SOLLEVAMENTO CINEMATICO 3D
+            // 6. Applicazione Cinematica 3D A-Frame
             baseAngleDeg += (vBaseVal * 20) * deltaTime * 60;
             discAngleDeg += (vDiscoVal * 20) * deltaTime * 60;
 
             baseBeamGroup.setAttribute('rotation', `0 ${baseAngleDeg} 0`);
-            armPivotGroup.setAttribute('rotation', `0 0 ${-angVal}`); // Inclinazione cerniera
+            armPivotGroup.setAttribute('rotation', `0 0 ${-angVal}`); // Inclinazione su asse Z
             discGroup.setAttribute('rotation', `0 ${-discAngleDeg} 0`);
         }
 
