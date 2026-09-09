@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v1.3.0</title>
+    <title>Hully Gully WebXR Simulator v1.4.0</title>
     
     <!-- Librerie CSS & WebXR -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -32,10 +32,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v1.3.0
+                v1.4.0
             </span>
         </div>
-        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D / Meta Quest 3</p>
+        <p class="text-xs text-slate-400 mb-4">Simulatore Giostra 3D / Direct Gamepad API</p>
 
         <!-- Bottoni Selezione Modalità WebXR -->
         <div class="grid grid-cols-2 gap-3 mb-4">
@@ -45,7 +45,7 @@
             </button>
             <button id="btnAR" onclick="enterXR('ar')" class="py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs rounded-xl shadow-lg border border-teal-400/30 transition flex items-center justify-center space-x-2">
                 <span>&#128083;</span>
-                <span>Avvia AR</span>
+                <span>Avvia AR (Passthrough)</span>
             </button>
         </div>
 
@@ -71,19 +71,19 @@
         </div>
 
         <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
-            <p><strong>Mappatura Quest 3:</strong></p>
+            <p><strong>Mappatura Quest 3 (Direct Gamepad):</strong></p>
             <p>• Grilletto DX: Puntamento e Teletrasporto (H = 3m)</p>
-            <p>• Stick DX (Sx/Dx): Incrementa/Decrementa VBASE</p>
-            <p>• Stick DX (Su/Giù): Incrementa/Decrementa VANG</p>
-            <p>• Stick SX (Sx/Dx): Incrementa/Decrementa VDISCO</p>
+            <p>• Stick DX (Sx/Dx): Modifica VBASE</p>
+            <p>• Stick DX (Su/Giù): Modifica VANG</p>
+            <p>• Stick SX (Sx/Dx): Modifica VDISCO</p>
             <p>• Tasto A / X: Aggancio Dondolio (3s)</p>
         </div>
     </div>
 
     <!-- SCENA A-FRAME / WEBXR -->
     <a-scene 
-        webxr="optionalFeatures: hit-test, local-floor; referenceSpaceType: local-floor"
-        renderer="antialias: true; colorManagement: true; exposure: 1.0; shadowMapEnabled: true"
+        webxr="optionalFeatures: hit-test, local-floor, passthrough; referenceSpaceType: local-floor"
+        renderer="transparent: true; alpha: true; antialias: true; colorManagement: true; exposure: 1.0; shadowMapEnabled: true"
         embedded
         class="w-full h-screen">
 
@@ -147,21 +147,11 @@
         <!-- TARGET CERCHIO PUNTAMENTO TELETRASPORTO -->
         <a-ring id="teleportRing" radius-inner="0.4" radius-outer="0.6" color="#00ff88" rotation="-90 0 0" visible="false" material="shader: flat; opacity: 0.8"></a-ring>
 
-        <!-- RIG CAMERA & CONTROLLER META QUEST 3 -->
+        <!-- RIG CAMERA & CONTROLLER WEBXR SENZA MODELLI OBSOLETI -->
         <a-entity id="rig" position="0 3.0 25">
             <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: false"></a-camera>
-            
-            <!-- Controller SX Quest 3 -->
-            <a-entity id="leftController" 
-                      meta-touch-controls="hand: left" 
-                      oculus-touch-controls="hand: left" 
-                      vr-controls-left></a-entity>
-            
-            <!-- Controller DX Quest 3 -->
-            <a-entity id="rightController" 
-                      meta-touch-controls="hand: right" 
-                      oculus-touch-controls="hand: right" 
-                      vr-controls-right
+            <a-entity id="leftController" hand-controls="hand: left"></a-entity>
+            <a-entity id="rightController" hand-controls="hand: right"
                       raycaster="objects: .teleport-target; showLine: false; enabled: false"
                       line="color: #00ff88; opacity: 0.7"></a-entity>
         </a-entity>
@@ -170,7 +160,7 @@
 
     <!-- LOGICA JS VANILLA E CINEMATICA -->
     <script>
-        const GAME_VERSION = "1.3.0";
+        const GAME_VERSION = "1.4.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const discGroup = document.getElementById('discGroup');
@@ -181,6 +171,7 @@
         const uiContainer = document.getElementById('ui-container');
         const rig = document.getElementById('rig');
         const teleportRing = document.getElementById('teleportRing');
+        const rightController = document.getElementById('rightController');
 
         const valVBase = document.getElementById('valVBase');
         const valVDisco = document.getElementById('valVDisco');
@@ -252,16 +243,15 @@
         let vDiscoVal = 0.0;
         let angVal = 0.0;
 
-        // Stato Inclinazione Levette Analogiche VR
-        let vrStickLeftX = 0;
-        let vrStickRightX = 0;
-        let vrStickRightY = 0;
-
         let isLocked = false;
         let isTransitioning = false;
         let transitionStartTime = 0;
         let startVDisco = 0;
         const TRANSITION_DURATION = 3000;
+
+        let btnPressedPrev = false;
+        let triggerPressedPrev = false;
+        let targetPoint = null;
 
         const keysPressed = {};
 
@@ -307,62 +297,75 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // COMPONENTI A-FRAME CUSTOM PER CONTROLLER QUEST 3
-        AFRAME.registerComponent('vr-controls-left', {
-            init: function () {
-                this.el.addEventListener('thumbstickmoved', (evt) => {
-                    vrStickLeftX = evt.detail.x;
-                });
-                this.el.addEventListener('xbuttondown', toggleLock);
-                this.el.addEventListener('ybuttondown', toggleLock);
+        // DIRECT GAMEPAD API POLLING (NATIVO QUEST 3)
+        function pollGamepads(deltaTime) {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const speedStep = 0.8 * deltaTime;
+            const angleStep = 12.0 * deltaTime;
+
+            for (const gp of gamepads) {
+                if (!gp || !gp.axes) continue;
+
+                // Controller Destro
+                if (gp.hand === 'right') {
+                    const stickX = gp.axes[2] !== undefined ? gp.axes[2] : (gp.axes[0] || 0);
+                    const stickY = gp.axes[3] !== undefined ? gp.axes[3] : (gp.axes[1] || 0);
+
+                    // Stick Orizzontale -> VBASE
+                    if (Math.abs(stickX) > 0.15) {
+                        vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + stickX * speedStep));
+                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+                    }
+
+                    // Stick Verticale -> VANG
+                    if (Math.abs(stickY) > 0.15) {
+                        angVal = Math.max(0.0, Math.min(22.0, angVal - stickY * angleStep));
+                    }
+
+                    // Bottone A / B / X (Indici 4 o 5) -> Toggle Aggancio
+                    const btnPressed = (gp.buttons[4] && gp.buttons[4].pressed) || (gp.buttons[5] && gp.buttons[5].pressed);
+                    if (btnPressed && !btnPressedPrev) {
+                        toggleLock();
+                    }
+                    btnPressedPrev = btnPressed;
+
+                    // Grilletto (Indice 0) -> Teletrasporto
+                    const triggerPressed = gp.buttons[0] && gp.buttons[0].pressed;
+                    if (triggerPressed && !triggerPressedPrev) {
+                        rightController.setAttribute('raycaster', 'enabled', true);
+                        rightController.setAttribute('raycaster', 'showLine', true);
+                        teleportRing.setAttribute('visible', true);
+                    } else if (!triggerPressed && triggerPressedPrev) {
+                        if (targetPoint) {
+                            rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
+                        }
+                        targetPoint = null;
+                        rightController.setAttribute('raycaster', 'enabled', false);
+                        rightController.setAttribute('raycaster', 'showLine', false);
+                        teleportRing.setAttribute('visible', false);
+                    }
+                    triggerPressedPrev = triggerPressed;
+                }
+
+                // Controller Sinistro
+                if (gp.hand === 'left') {
+                    const stickX = gp.axes[2] !== undefined ? gp.axes[2] : (gp.axes[0] || 0);
+
+                    // Stick Orizzontale -> VDISCO
+                    if (Math.abs(stickX) > 0.15) {
+                        vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + stickX * speedStep));
+                        if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
+                    }
+                }
             }
-        });
+        }
 
-        AFRAME.registerComponent('vr-controls-right', {
-            init: function () {
-                const el = this.el;
-                let isPointing = false;
-                let targetPoint = null;
-
-                this.el.addEventListener('thumbstickmoved', (evt) => {
-                    vrStickRightX = evt.detail.x;
-                    vrStickRightY = evt.detail.y;
-                });
-
-                el.addEventListener('abuttondown', toggleLock);
-                el.addEventListener('bbuttondown', toggleLock);
-
-                // Grilletto -> Puntamento Teletrasporto
-                el.addEventListener('triggerdown', () => {
-                    isPointing = true;
-                    el.setAttribute('raycaster', 'enabled', true);
-                    el.setAttribute('raycaster', 'showLine', true);
-                    teleportRing.setAttribute('visible', true);
-                });
-
-                el.addEventListener('triggerup', () => {
-                    if (isPointing && targetPoint) {
-                        rig.setAttribute('position', `${targetPoint.x} 3.0 ${targetPoint.z}`);
-                    }
-                    isPointing = false;
-                    targetPoint = null;
-                    el.setAttribute('raycaster', 'enabled', false);
-                    el.setAttribute('raycaster', 'showLine', false);
-                    teleportRing.setAttribute('visible', false);
-                });
-
-                el.addEventListener('raycaster-intersection', (evt) => {
-                    if (!isPointing) return;
-                    const intersection = evt.detail.intersections[0];
-                    if (intersection) {
-                        targetPoint = intersection.point;
-                        teleportRing.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);
-                    }
-                });
-
-                el.addEventListener('raycaster-intersection-cleared', () => {
-                    targetPoint = null;
-                });
+        // Listener raycaster per agganciare il punto a terra
+        rightController.addEventListener('raycaster-intersection', (evt) => {
+            const intersection = evt.detail.intersections[0];
+            if (intersection) {
+                targetPoint = intersection.point;
+                teleportRing.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);
             }
         });
 
@@ -377,25 +380,13 @@
             const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
             lastTime = currentTime;
 
+            // Direct Gamepad Polling
+            pollGamepads(deltaTime);
+
+            // Input Tastiera PC
             const speedStep = 0.35 * deltaTime;
             const angleStep = 8.0 * deltaTime;
 
-            // 1. ELABORAZIONE LEVETTE VR (Continuo come i tasti)
-            if (Math.abs(vrStickRightX) > 0.15) {
-                vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + vrStickRightX * speedStep * 2));
-                if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
-            }
-
-            if (Math.abs(vrStickRightY) > 0.15) {
-                angVal = Math.max(0.0, Math.min(22.0, angVal - vrStickRightY * angleStep));
-            }
-
-            if (Math.abs(vrStickLeftX) > 0.15) {
-                vDiscoVal = Math.max(0.0, Math.min(3.0, vDiscoVal + vrStickLeftX * speedStep * 2));
-                if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
-            }
-
-            // 2. ELABORAZIONE TASTIERA PC
             if (keysPressed['arrowleft']) {
                 vBaseVal = Math.max(0.0, vBaseVal - speedStep);
                 if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
@@ -454,8 +445,12 @@
             const sceneEl = document.querySelector('a-scene');
             
             if (mode === 'ar') {
+                // Rende il background trasparente per abilitare Passthrough
                 skyBox.setAttribute('visible', 'false');
                 groundGrid.setAttribute('visible', 'false');
+                if (sceneEl.sceneEl && sceneEl.sceneEl.renderer) {
+                    sceneEl.sceneEl.renderer.setClearColor(0x000000, 0);
+                }
                 sceneEl.enterVR();
             } else {
                 skyBox.setAttribute('visible', 'true');
