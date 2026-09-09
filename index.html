@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.3.0</title>
+    <title>Hully Gully WebXR Simulator v2.4.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.3.0
+                v2.4.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Limite Max 5.0 & World Scale</p>
+        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Moltiplicatori Sincronizzati</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -94,7 +94,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.3.0";
+        const GAME_VERSION = "v2.4.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -106,7 +106,7 @@
         let teleportTargets = [];
         let raycaster = new THREE.Raycaster();
 
-        // Variabili Giostra (Limite max portato a 5.0)
+        // Variabili Giostra
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
@@ -242,7 +242,7 @@
             ground.position.y = -0.62;
             ground.receiveShadow = true;
             scene.add(ground);
-            teleportTargets.push(ground); // Aggiunto in modo sicuro ai target
+            teleportTargets.push(ground);
 
             const grid = new THREE.GridHelper(70, 70, 0xff0055, 0x64748b);
             grid.position.y = -0.61;
@@ -255,7 +255,7 @@
             platform.position.y = -0.3;
             platform.receiveShadow = true;
             scene.add(platform);
-            teleportTargets.push(platform); // Aggiunto in modo sicuro ai target
+            teleportTargets.push(platform);
 
             // Cerchio di destinazione teletrasporto
             const ringGeo = new THREE.RingGeometry(0.4, 0.6, 32);
@@ -429,7 +429,7 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // Elaborazione Input Controller XR (Levette, World Scale Zoom e Teletrasporto sicuro)
+        // Elaborazione Input Controller XR
         function processXRControllers(delta) {
             const session = renderer.xr.getSession();
             if (!session) return;
@@ -448,36 +448,30 @@
                 const yAxis = axes.length > 3 ? axes[3] : (axes[1] || 0);
 
                 if (source.handedness === 'left') {
-                    // Levetta SX Orizzontale -> VDISCO (Max 5.0)
                     if (Math.abs(xAxis) > DEADZONE) {
                         vDiscoVal = Math.max(0.0, Math.min(MAX_SPEED, vDiscoVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
-                    // Levetta SX Verticale -> ZOOM SCALA DEL MONDO (CameraRig Scale)
                     if (Math.abs(yAxis) > DEADZONE) {
                         let currentScale = cameraRig.scale.x;
                         currentScale = Math.max(0.2, Math.min(4.0, currentScale - yAxis * scaleRate));
                         cameraRig.scale.set(currentScale, currentScale, currentScale);
                     }
                 } else if (source.handedness === 'right') {
-                    // Levetta DX Orizzontale -> VBASE (Max 5.0)
                     if (Math.abs(xAxis) > DEADZONE) {
                         vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
                     }
-                    // Levetta DX Verticale -> VANG
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
 
-                    // Tasto A -> Toggle Aggancio 1:1
                     const btnA = buttons[4] && buttons[4].pressed;
                     if (btnA && !btnAPressedPrev) {
                         toggleLock();
                     }
                     btnAPressedPrev = btnA;
 
-                    // Grilletto -> Teletrasporto sicuro con raycasting su teleportTargets
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
 
@@ -523,21 +517,18 @@
             const delta = clock.getDelta();
             const currentTime = performance.now();
 
-            // 1. Elaborazione input levette e teletrasporto VR
             processXRControllers(delta);
 
-            // 2. Input Tastiera PC (Fallback - Max 5.0)
             const speedStep = 0.5 * delta;
             const angleStep = 8.0 * delta;
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vBaseVal; }
+            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
-            // 3. Gestione Transizione Aggancio (3 secondi)
             if (isLocked && isTransitioning) {
                 const elapsedMs = currentTime - transitionStartTime;
                 const progress = Math.min(elapsedMs / TRANSITION_DURATION, 1.0);
@@ -556,16 +547,16 @@
                 }
             }
 
-            // Aggiornamento UI 2D
             document.getElementById('valVBase').textContent = vBaseVal.toFixed(2);
             document.getElementById('valVDisco').textContent = vDiscoVal.toFixed(2);
             document.getElementById('valAng').textContent = angVal.toFixed(1) + '°';
 
             updateHudTexture();
 
-            // Cinematica 3D Giostra (Calibrata per consentire dolcezza a bassi regimi e piena velocità fino a 5.0)
-            const baseRotDegPerSec = vBaseVal * 15.0; 
-            const discRotDegPerSec = vDiscoVal * 25.0; 
+            // CINEMATICA SINCRONIZZATA (SPEED_MULTIPLIER uguali a 20.0 per base e disco)
+            const SPEED_MULTIPLIER = 20.0;
+            const baseRotDegPerSec = vBaseVal * SPEED_MULTIPLIER; 
+            const discRotDegPerSec = vDiscoVal * SPEED_MULTIPLIER; 
             const angRad = (angVal * Math.PI) / 180;
 
             baseAngleDeg += baseRotDegPerSec * delta;
