@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.0.0</title>
+    <title>Hully Gully WebXR Simulator v3.1.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.0.0
+                v3.1.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">8 Luci RGB Dinamiche & Sfondo Corretto</p>
+        <p class="text-xs text-slate-500 mb-4">Performance Ottimizzate & Tasto X Aggancio</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -81,7 +81,8 @@
             <p><strong>Mappatura VR:</strong></p>
             <p>• Stick SX (Oriz): VDISCO</p>
             <p>• Stick DX (Oriz): VBASE | (Vert): VANG</p>
-            <p>• Tasto Y (Sinistro): Attiva/Disattiva Vista Carrozza</p>
+            <p>• <strong>Tasto X (Sinistro): Aggancio / Sgancio Velocità</strong></p>
+            <p>• <strong>Tasto Y (Sinistro): Vista Carrozza (Direzione Moto)</strong></p>
             <p>• Tasti A (-) e B (+): Scala del Mondo (Controller Destro)</p>
             <p>• Grilletto DX: Teletrasporto sicuro sul pavimento</p>
         </div>
@@ -95,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.0.0";
+        const GAME_VERSION = "v3.1.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -108,6 +109,13 @@
         let carriageGroups = [];
         let animatedSpotLights = [];
         let raycaster = new THREE.Raycaster();
+
+        // Oggetti riutilizzabili per evitare allocazioni nel loop (GC Optimization)
+        const _tempVector = new THREE.Vector3();
+        const _tempQuaternion = new THREE.Quaternion();
+        const _carWorldPos = new THREE.Vector3();
+        const _carWorldQuat = new THREE.Quaternion();
+        const _rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
         // Variabili Giostra
         let vBaseVal = 0.0;
@@ -125,7 +133,8 @@
         let discAngleDeg = 0;
 
         let discGroup, baseBeamGroup, armPivotGroup;
-        let btnCarPressedPrev = false;
+        let btnXPressedPrev = false;
+        let btnYPressedPrev = false;
         let triggerPressedPrev = false;
         let targetPoint = null;
         let inCarView = false;
@@ -151,11 +160,14 @@
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
             dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
 
-            // Renderer WebXR
+            // Renderer WebXR ottimizzato
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -222,13 +234,13 @@
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
             worldGroup.add(transparentCyl);
 
-            // Semicilindro Posteriore per lo Scenario Sfondo.png (Ribaltato orizzontalmente per leggere da sinistra a destra)
+            // Semicilindro Posteriore per lo Scenario Sfondo.png (Ribaltato orizzontalmente)
             const textureLoader = new THREE.TextureLoader();
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
                     texture.colorSpace = THREE.SRGBColorSpace; 
                     texture.wrapS = THREE.RepeatWrapping;
-                    texture.repeat.x = -1; // Ribaltamento orizzontale
+                    texture.repeat.x = -1;
                     texture.offset.x = 1;
                 },
                 undefined,
@@ -246,7 +258,7 @@
             backCyl.rotation.y = Math.PI / 2;
             worldGroup.add(backCyl);
 
-            // 8 Torri Faro posizionate sulla circonferenza della piattaforma (raggio 11m) con cambio colore dinamico
+            // 8 Torri Faro sulla circonferenza (senza ombre per massimizzare il frame rate in VR)
             const numTowers = 8;
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 6.0;
@@ -266,10 +278,11 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                const spotLight = new THREE.SpotLight(0xffffff, 2.2, 45, Math.PI / 3, 0.4, 1);
+                // castShadow = false per ottimizzare drasticamente le performance in VR
+                const spotLight = new THREE.SpotLight(0xffffff, 2.0, 45, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
-                spotLight.castShadow = true;
+                spotLight.castShadow = false; 
                 worldGroup.add(spotLight);
                 worldGroup.add(spotLight.target);
 
@@ -291,7 +304,7 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Piattaforma Base Giostra (Raggio 11 -> Diametro 22m)
+            // Piattaforma Base Giostra
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
             const platform = new THREE.Mesh(platformGeo, platformMat);
@@ -498,21 +511,28 @@
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
 
-                    // Tasto Y sul controller sinistro -> Attiva/Disattiva Vista Carrozza
-                    const btnY = buttons[5] && buttons[5].pressed;
-                    if (btnY && !btnCarPressedPrev) {
+                    // Tasto X sul controller sinistro (indice 3) -> Attiva/Disattiva Aggancio
+                    const btnX = buttons[3] && buttons[3].pressed;
+                    if (btnX && !btnXPressedPrev) {
+                        toggleLock();
+                    }
+                    btnXPressedPrev = btnX;
+
+                    // Tasto Y sul controller sinistro (indice 4 o 5) -> Attiva/Disattiva Vista Carrozza
+                    const btnY = (buttons[4] && buttons[4].pressed) || (buttons[5] && buttons[5].pressed);
+                    if (btnY && !btnYPressedPrev) {
                         inCarView = !inCarView;
                         if (!inCarView) {
                             worldGroup.scale.set(1, 1, 1);
                             cameraRig.position.set(0, 3.0, 25);
                         }
                     }
-                    btnCarPressedPrev = btnY;
+                    btnYPressedPrev = btnY;
 
                 } else if (source.handedness === 'right') {
                     if (Math.abs(xAxis) > DEADZONE) {
                         vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
-                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
+                        if (isLocked && !isTransitioning) vDiscoVal = vDiscoVal;
                     }
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
@@ -591,6 +611,24 @@
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
+            if (isLocked && isTransitioning) {
+                const elapsedMs = currentTime - transitionStartTime;
+                const progress = Math.min(elapsedMs / TRANSITION_DURATION, 1.0);
+                const easedProgress = easeInOutSine(progress);
+
+                vDiscoVal = startVDisco + (vBaseVal - startVDisco) * easedProgress;
+
+                const remTime = Math.max(0, (TRANSITION_DURATION - elapsedMs) / 1000).toFixed(1);
+                const badgeText = document.getElementById('badgeText');
+                if (badgeText) badgeText.innerHTML = `&#9203; Aggancio in corso: ${remTime}s`;
+
+                if (progress >= 1.0) {
+                    isTransitioning = false;
+                    vDiscoVal = vBaseVal;
+                    setLockedUI();
+                }
+            }
+
             document.getElementById('valVBase').textContent = vBaseVal.toFixed(2);
             document.getElementById('valVDisco').textContent = vDiscoVal.toFixed(2);
             document.getElementById('valAng').textContent = angVal.toFixed(1) + '°';
@@ -616,19 +654,16 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
+            // Gestione Vista Carrozza (Direzione allineata al moto del disco tramite _rotOffset)
             if (inCarView && carriageGroups.length > 0) {
                 const car = carriageGroups[0];
-                const carWorldPos = new THREE.Vector3();
-                const carWorldQuat = new THREE.Quaternion();
-                car.getWorldPosition(carWorldPos);
-                car.getWorldQuaternion(carWorldQuat);
+                car.getWorldPosition(_carWorldPos);
+                car.getWorldQuaternion(_carWorldQuat);
 
-                cameraRig.position.copy(carWorldPos);
+                cameraRig.position.copy(_carWorldPos);
                 cameraRig.position.y += 0.35;
-                cameraRig.quaternion.copy(carWorldQuat);
-
-                const rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-                cameraRig.quaternion.multiply(rotOffset);
+                cameraRig.quaternion.copy(_carWorldQuat);
+                cameraRig.quaternion.multiply(_rotOffset); // Allineato nella direzione del moto
             }
 
             if (!renderer.xr.isPresenting) {
