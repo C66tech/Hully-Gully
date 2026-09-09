@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v2.1.0</title>
+    <title>Hully Gully WebXR Simulator v2.2.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v2.1.0
+                v2.2.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Cinematica Ottimizzata</p>
+        <p class="text-xs text-slate-500 mb-4">Simulatore Giostra 12m - Cinematica Calibrata</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -94,7 +94,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v2.1.0";
+        const GAME_VERSION = "v2.2.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -202,9 +202,9 @@
         }
 
         function createEnvironment() {
-            // Torri Faro (12m)
+            // Torri Faro (Altezza ridotta a 6m, pali sottili)
             const lightTowerRadius = 12.0;
-            const lightTowerHeight = 12.0;
+            const lightTowerHeight = 6.0; // Dimezzato da 12m a 6m
             const towerColors = [0x00f0ff, 0xff0077, 0x00ff88, 0xffcc00];
 
             for (let i = 0; i < 4; i++) {
@@ -215,14 +215,16 @@
                 const towerGroup = new THREE.Group();
                 towerGroup.position.set(posX, 0, posZ);
 
+                // Palo molto più sottile (raggio 0.03 invece di 0.12/0.25)
                 const pole = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.12, 0.25, lightTowerHeight, 16),
+                    new THREE.CylinderGeometry(0.03, 0.03, lightTowerHeight, 16),
                     new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
                 );
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 50, Math.PI / 3, 0.4, 1);
+                // Faretto posizionato alla nuova sommità (6m) ma orientato verso il centro
+                const spotLight = new THREE.SpotLight(towerColors[i], 2.2, 40, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = true;
@@ -351,7 +353,12 @@
                 controllers.push(controller);
 
                 const controllerGrip = renderer.xr.getControllerGrip(i);
-                controllerGrip.add(controllerModelFactory.createControllerModel(controllerGrip));
+                const model = controllerModelFactory.createControllerModel(controllerGrip);
+                controllerGrip.add(model);
+                
+                // Ingranditi leggermente (1.3x) per non sembrare microscopici
+                controllerGrip.scale.set(1.3, 1.3, 1.3);
+
                 scene.add(controllerGrip);
                 controllerGrips.push(controllerGrip);
             }
@@ -431,7 +438,7 @@
 
             const DEADZONE = 0.15;
             const speedRate = 1.0 * delta;
-            const angleRate = 10.0 * delta; // Rallentato leggermente ANG
+            const angleRate = 10.0 * delta;
             const zoomRate = 4.0 * delta;
 
             for (const source of session.inputSources) {
@@ -458,7 +465,7 @@
                         vBaseVal = Math.max(0.0, Math.min(3.0, vBaseVal + xAxis * speedRate));
                         if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
                     }
-                    // Levetta DX Verticale -> VANG (Braccio leggermente rallentato)
+                    // Levetta DX Verticale -> VANG (Braccio)
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
@@ -487,7 +494,7 @@
 
                         if (trigger) {
                             if (intersects.length > 0) {
-                                targetPoint = intersects[0].point;
+                                targetPoint = intersects.point;
                                 teleportRing.position.copy(targetPoint);
                                 teleportRing.position.y += 0.02;
                                 teleportRing.visible = true;
@@ -557,17 +564,17 @@
 
             updateHudTexture();
 
-            // Cinematica 3D Giostra (Rotazioni fortemente ridotte e rese fluide tramite delta time)
-            const baseRotDelta = vBaseVal * delta * 0.75;  // Velocità base realistica e morbida
-            const discRotDelta = vDiscoVal * delta * 1.5;   // Velocità disco realistica e morbida
+            // Cinematica 3D Giostra (Velocità angolari reali ed estremamente fluide)
+            const baseRotDegPerSec = vBaseVal * 12.0; // max ~36° al secondo
+            const discRotDegPerSec = vDiscoVal * 20.0; // max ~60° al secondo
             const angRad = (angVal * Math.PI) / 180;
 
-            baseAngleDeg += baseRotDelta * (180 / Math.PI);
-            discAngleDeg += discRotDelta * (180 / Math.PI);
+            baseAngleDeg += baseRotDegPerSec * delta;
+            discAngleDeg += discRotDegPerSec * delta;
 
-            if (baseBeamGroup) baseBeamGroup.rotation.y = baseAngleDeg;
+            if (baseBeamGroup) baseBeamGroup.rotation.y = THREE.MathUtils.degToRad(baseAngleDeg);
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
-            if (discGroup) discGroup.rotation.y = -discAngleDeg;
+            if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
             controls.update();
             renderer.render(scene, camera);
