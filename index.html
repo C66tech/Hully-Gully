@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.8.0</title>
+    <title>Hully Gully WebXR Simulator v4.9.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.8.0
+                v4.9.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">4 Luci Anteriori a 5m & Tasto <kbd>Q</kbd> Giorno/Notte</p>
+        <p class="text-xs text-slate-500 mb-4">BumpMap Base.png 10x10 & 4 Luci 5m</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.8.0";
+        const GAME_VERSION = "v4.9.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340)
@@ -310,6 +310,7 @@
         function createEnvironment() {
             const platformRadius = 11.0;
             const cylinderHeight = 10.0;
+            const textureLoader = new THREE.TextureLoader();
 
             // Cilindro Guida Invisibile
             const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
@@ -324,7 +325,6 @@
             worldGroup.add(transparentCyl);
 
             // Semicilindro Posteriore Sfondo.png
-            const textureLoader = new THREE.TextureLoader();
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
                     texture.colorSpace = THREE.SRGBColorSpace; 
@@ -352,10 +352,10 @@
             
             worldGroup.add(backCyl);
 
-            // 4 Luci Fari Anteriori a 5m di altezza
+            // 4 Luci Fari Anteriori a 5m
             const frontAngles = [-Math.PI / 3, -Math.PI / 9, Math.PI / 9, Math.PI / 3];
             const lightTowerRadius = 11.0;
-            const lightTowerHeight = 5.0; // Altezza impostata esattamente a 5.0m
+            const lightTowerHeight = 5.0;
 
             for (let i = 0; i < 4; i++) {
                 const angle = frontAngles[i];
@@ -377,7 +377,6 @@
                 spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = false;
 
-                // Alternate: Verde e Rosso
                 const initialHue = (i % 2 === 0) ? 0.33 : 0.0;
                 spotLight.color.setHSL(initialHue, 1.0, 0.5);
 
@@ -404,8 +403,25 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
+            // Caricamento Bump Map Base.png con ripetizione 10x10
+            const baseBumpTex = textureLoader.load('Base.png', (texture) => {
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(10, 10);
+            }, undefined, () => {
+                console.warn('Base.png non trovato nella root.');
+            });
+
+            // Piattaforma di Base con Bump Map applicata
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
-            const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
+            const platformMat = new THREE.MeshStandardMaterial({ 
+                color: 0x64748b, 
+                roughness: 0.6, 
+                metalness: 0.2,
+                bumpMap: baseBumpTex,
+                bumpScale: 0.05
+            });
+            
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
             platform.receiveShadow = true;
