@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.8.0</title>
+    <title>Hully Gully WebXR Simulator v3.9.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,7 +51,7 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.8.0
+                v3.9.0
             </span>
         </div>
         <p class="text-xs text-slate-500 mb-4">Ancoraggio Carrozze a 0.6m & Base Cono Elevata</p>
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.8.0";
+        const GAME_VERSION = "v3.9.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -437,7 +437,7 @@
 
             for (let i = 0; i < numCars; i++) {
                 const angle = (i / numCars) * Math.PI * 2;
-                const carRadius = discRadius - 0.6;
+                const carRadius = discRadius - 0.8;
                 const carGroup = new THREE.Group();
                 
                 // Ancoraggio carrozze fissato esattamente a y = 0.8m
