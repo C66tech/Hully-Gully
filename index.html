@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.4.0</title>
+    <title>Hully Gully WebXR Simulator v3.6.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.4.0
+                v3.6.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Modello Carrozza Dettagliato & Controlli VR</p>
+        <p class="text-xs text-slate-500 mb-4">Cono H2m Diametro 12m & Barre Inclinate</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.4.0";
+        const GAME_VERSION = "v3.6.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -214,7 +214,6 @@
             renderer.setAnimationLoop(animate);
         }
 
-        // Funzione per creare la carrozza dettagliata basata sulle primitive fornite
         function createDetailedCarriage() {
             const mainGroup = new THREE.Group();
             mainGroup.name = "carrozza";
@@ -287,17 +286,15 @@
             mesh.scale.set(0.775, 0.126, 0.078);
             mainGroup.add(mesh);
 
-            // Scala di adattamento opzionale se necessario rispetto al layout esistente della giostra
             mainGroup.scale.set(0.7, 0.7, 0.7);
 
             return mainGroup;
         }
 
         function createEnvironment() {
-            const platformRadius = 11.0; // Diametro 22 metri
+            const platformRadius = 11.0;
             const cylinderHeight = 10.0;
 
-            // Cilindro Principale Invisibile
             const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
             const transparentCylMat = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
@@ -309,7 +306,6 @@
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
             worldGroup.add(transparentCyl);
 
-            // Semicilindro Posteriore per lo Scenario Sfondo.png (Ribaltato orizzontalmente)
             const textureLoader = new THREE.TextureLoader();
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
@@ -333,7 +329,6 @@
             backCyl.rotation.y = Math.PI / 2;
             worldGroup.add(backCyl);
 
-            // 4 Luci nella parte frontale della giostra (z > 0)
             const frontAngles = [-Math.PI / 4, -Math.PI / 12, Math.PI / 12, Math.PI / 4];
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 6.0;
@@ -369,7 +364,6 @@
                 animatedSpotLights.push(spotLight);
             }
 
-            // Piano Pavimento Grigio Chiaro e Griglia
             const groundGeo = new THREE.PlaneGeometry(100, 100);
             const groundMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
             const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -383,7 +377,6 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Piattaforma Base Giostra
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6, metalness: 0.2 });
             const platform = new THREE.Mesh(platformGeo, platformMat);
@@ -392,7 +385,6 @@
             worldGroup.add(platform);
             teleportTargets.push(platform);
 
-            // Cerchio di destinazione teletrasporto
             const ringGeo = new THREE.RingGeometry(0.4, 0.6, 32);
             ringGeo.rotateX(-Math.PI / 2);
             const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
@@ -400,7 +392,6 @@
             teleportRing.visible = false;
             worldGroup.add(teleportRing);
 
-            // Giostra Principale
             baseBeamGroup = new THREE.Group();
             baseBeamGroup.position.y = -0.3;
             worldGroup.add(baseBeamGroup);
@@ -424,48 +415,57 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            const discRadius = 6.0; // Diametro 12m della giostra
-            const discMesh = new THREE.Mesh(
-                new THREE.CylinderGeometry(discRadius, discRadius * 0.95, 0.4, 64),
+            // Sostituzione Disco con Grande Cono (Diametro 12m, Raggio 6m, Altezza 2m)
+            const discRadius = 6.0;
+            const coneHeight = 2.0;
+            const mainConeMesh = new THREE.Mesh(
+                new THREE.ConeGeometry(discRadius, coneHeight, 64),
                 new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 })
             );
-            discMesh.position.y = 0.30;
-            discGroup.add(discMesh);
+            mainConeMesh.position.y = coneHeight / 2; // Centro a 1m per poggiare la base a y = 0
+            discGroup.add(mainConeMesh);
 
-            const centerCone = new THREE.Mesh(
-                new THREE.ConeGeometry(1.5, 1, 24),
-                new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.5 })
-            );
-            centerCone.position.y = 0.9;
-            discGroup.add(centerCone);
-
-            // Generazione 16 Carrozze Dettagliate
+            // Generazione 16 Carrozze e 16 Barre Inclinate sulla Superficie del Cono
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
+
+            // Inclinazione della generatrice del cono: theta = arctan(H / R)
+            const coneInclineAngle = Math.atan2(coneHeight, discRadius); // rad
+            const spokeLength = Math.sqrt(discRadius * discRadius + coneHeight * coneHeight) - 0.6;
 
             for (let i = 0; i < numCars; i++) {
                 const angle = (i / numCars) * Math.PI * 2;
                 const carRadius = discRadius - 0.5;
                 const carGroup = new THREE.Group();
-                carGroup.position.set(Math.sin(angle) * carRadius, 0.3, Math.cos(angle) * carRadius);
+                
+                // Posizionamento carrozze alla base esterna
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.9, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
-                // Inserimento della carrozza dettagliata definita dall'utente
                 const detailedCar = createDetailedCarriage();
                 carGroup.add(detailedCar);
 
                 discGroup.add(carGroup);
                 carriageGroups.push(carGroup);
 
+                // Barre/Raggi adagiate lungo la superficie inclinata del cono
                 const spokeAngle = angle + halfStepAngle;
+                const spokePivotGroup = new THREE.Group();
+                spokePivotGroup.position.set(0, coneHeight, 0); // Ancoraggio sulla cima del cono
+                spokePivotGroup.rotation.y = spokeAngle;
+                
                 const spoke = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.12, 0.05, discRadius - 0.6),
+                    new THREE.BoxGeometry(0.12, 0.05, spokeLength),
                     new THREE.MeshBasicMaterial({ color: spokeColors[i % 3] })
                 );
-                spoke.position.set(Math.sin(spokeAngle) * (discRadius / 2), 0.52, Math.cos(spokeAngle) * (discRadius / 2));
-                spoke.rotation.y = spokeAngle;
-                discGroup.add(spoke);
+                
+                // Rotazione in Pitch per seguire la pendenza del cono
+                spoke.rotation.x = coneInclineAngle;
+                spoke.position.set(0, -coneHeight / 2, spokeLength / 2);
+
+                spokePivotGroup.add(spoke);
+                discGroup.add(spokePivotGroup);
             }
         }
 
@@ -563,7 +563,6 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // Elaborazione Input Controller XR
         function processXRControllers(delta) {
             const session = renderer.xr.getSession();
             if (!session) return;
@@ -587,7 +586,6 @@
                         if (isLocked && !isTransitioning) vBaseVal = vDiscoVal;
                     }
 
-                    // Tasti X (-) e Y (+) sul controller sinistro per la scala del mondo (se non in vista carrozza)
                     if (!inCarView) {
                         const btnX = buttons[4] && buttons[4].pressed;
                         const btnY = buttons[5] && buttons[5].pressed;
@@ -611,14 +609,12 @@
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
 
-                    // Tasto A sul controller destro -> Aggancio / Sgancio Velocità
                     const btnA = buttons[4] && buttons[4].pressed;
                     if (btnA && !btnAPressedPrev) {
                         toggleLock();
                     }
                     btnAPressedPrev = btnA;
 
-                    // Tasto B sul controller destro -> Vista Carrozza / Direzione Moto
                     const btnB = buttons[5] && buttons[5].pressed;
                     if (btnB && !btnBPressedPrev) {
                         inCarView = !inCarView;
@@ -676,7 +672,6 @@
 
             processXRControllers(delta);
 
-            // Input Tastiera PC (Fallback)
             const speedStep = 0.5 * delta;
             const angleStep = 8.0 * delta;
 
@@ -711,7 +706,6 @@
 
             updateHudTexture();
 
-            // Aggiornamento continuo del colore delle 4 luci frontali (ciclo HSL)
             const timeSec = currentTime * 0.0003;
             for (let i = 0; i < animatedSpotLights.length; i++) {
                 const hue = (timeSec + (i / animatedSpotLights.length)) % 1.0;
@@ -730,7 +724,6 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // Gestione Vista Carrozza (Direzione allineata al moto)
             if (inCarView && carriageGroups.length > 0) {
                 const car = carriageGroups[0];
                 car.getWorldPosition(_carWorldPos);
