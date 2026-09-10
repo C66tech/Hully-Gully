@@ -415,9 +415,9 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            // Grande Cono (Diametro 12m, Raggio 6m,)
+            // Grande Cono (Diametro 12m)
             const discRadius = 6.0;
-            const coneHeight = 1.3;
+            const coneHeight = 1.0;
             const baseElevation = 0.40;
 
             const mainConeMesh = new THREE.Mesh(
@@ -440,8 +440,8 @@
                 const carRadius = discRadius - 0.8;
                 const carGroup = new THREE.Group();
                 
-                // Ancoraggio carrozze fissato esattamente a y = 0.8m
-                carGroup.position.set(Math.sin(angle) * carRadius, 0.8, Math.cos(angle) * carRadius);
+                // Ancoraggio carrozze fissato esattamente a y = 0.6m
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.6, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
                 const detailedCar = createDetailedCarriage();
