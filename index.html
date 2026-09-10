@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.6.0</title>
+    <title>Hully Gully WebXR Simulator v4.8.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.6.0
+                v4.8.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Luce Notturna Blu Fioca & Tasto <kbd>Q</kbd> Giorno/Notte</p>
+        <p class="text-xs text-slate-500 mb-4">4 Luci Anteriori a 5m & Tasto <kbd>Q</kbd> Giorno/Notte</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.6.0";
+        const GAME_VERSION = "v4.8.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340)
@@ -217,7 +217,6 @@
                 const key = e.key.toLowerCase();
                 keysPressed[key] = true;
 
-                // Tasto Q su Desktop per Toggle Giorno/Notte
                 if (key === 'q') {
                     toggleDayNight();
                 }
@@ -226,7 +225,6 @@
                 keysPressed[e.key.toLowerCase()] = false;
             });
 
-            // Interazione Pointer Desktop per HUD
             window.addEventListener('pointerdown', onPointerDown);
 
             renderer.setAnimationLoop(animate);
@@ -354,12 +352,12 @@
             
             worldGroup.add(backCyl);
 
-            // 2 Luci Fari
-            const frontAngles = [-Math.PI / 6, Math.PI / 6];
+            // 4 Luci Fari Anteriori a 5m di altezza
+            const frontAngles = [-Math.PI / 3, -Math.PI / 9, Math.PI / 9, Math.PI / 3];
             const lightTowerRadius = 11.0;
-            const lightTowerHeight = 6.0;
+            const lightTowerHeight = 5.0; // Altezza impostata esattamente a 5.0m
 
-            for (let i = 0; i < 2; i++) {
+            for (let i = 0; i < 4; i++) {
                 const angle = frontAngles[i];
                 const posX = Math.sin(angle) * lightTowerRadius;
                 const posZ = Math.cos(angle) * lightTowerRadius;
@@ -374,12 +372,13 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                const spotLight = new THREE.SpotLight(0xffffff, 3.5, 45, Math.PI / 3, 0.4, 1);
+                const spotLight = new THREE.SpotLight(0xffffff, 3.5, 45, Math.PI / 2.2, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = false;
 
-                const initialHue = (i === 0) ? 0.33 : 0.0;
+                // Alternate: Verde e Rosso
+                const initialHue = (i % 2 === 0) ? 0.33 : 0.0;
                 spotLight.color.setHSL(initialHue, 1.0, 0.5);
 
                 worldGroup.add(spotLight);
@@ -603,7 +602,6 @@
         function toggleDayNight() {
             isNightMode = !isNightMode;
             if (isNightMode) {
-                // Notte: Luce ambientale e direzionale blu molto fioca
                 ambientLight.color.setHex(0x0044ff);
                 ambientLight.intensity = 0.05;
                 dirLight.color.setHex(0x1d4ed8);
@@ -611,7 +609,6 @@
                 scene.background = new THREE.Color(0x020617);
                 scene.fog.color.setHex(0x020617);
             } else {
-                // Giorno: Illuminazione solare bianca brillante
                 ambientLight.color.setHex(0xffffff);
                 ambientLight.intensity = 0.7;
                 dirLight.color.setHex(0xffffff);
