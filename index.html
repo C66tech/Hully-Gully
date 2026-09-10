@@ -416,10 +416,10 @@
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ 
                 color: 0x64748b, 
-                roughness: 0.6, 
-                metalness: 0.2,
+                roughness: 0.4, 
+                metalness: 0.4,
                 bumpMap: baseBumpTex,
-                bumpScale: 0.05
+                bumpScale: 0.5
             });
             
             const platform = new THREE.Mesh(platformGeo, platformMat);
