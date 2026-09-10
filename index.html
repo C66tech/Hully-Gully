@@ -415,14 +415,14 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            // Materiale unificato Arancione
+        
             const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 });
             const discMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFF20, roughness: 0.5 });
 
             // 1. Nuovo Disco di Base (Diametro 12m = Raggio 6m, Spessore 0.2m)
             const discBaseRadius = 6.0;
             const discBaseThickness = 0.2;
-            const baseElevation = 0.40;
+            const baseElevation = 0.25;
 
             const baseDiscMesh = new THREE.Mesh(
                 new THREE.CylinderGeometry(discBaseRadius, discBaseRadius, discBaseThickness, 64),
