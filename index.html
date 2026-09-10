@@ -230,7 +230,7 @@
 
             let mesh;
 
-            mesh = new THREE.Mesh(new THREE.RoundedBoxGeometry(1, 1, 1,4,0.2), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, 0.000, 0.831);
             mesh.scale.set(1.000, 0.649, 0.132);
             mainGroup.add(mesh);
