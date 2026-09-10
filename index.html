@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.9.2</title>
+    <title>Hully Gully WebXR Simulator v4.9.3</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.9.2
+                v4.9.3
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Disco BumpMap Base.png 10x10 Sovrapposto</p>
+        <p class="text-xs text-slate-500 mb-4">Mappatura NormalMap Base.png 10x10</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.9.2";
+        const GAME_VERSION = "v4.9.3";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
@@ -383,7 +383,7 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // 1. Piattaforma Cilindrica di Base (Standard)
+            // 1. Piattaforma Cilindrica di Base
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ 
                 color: 0x64748b, 
@@ -396,8 +396,8 @@
             worldGroup.add(platform);
             teleportTargets.push(platform);
 
-            // 2. Disco dedicato con Bump Map 10x10 sovrapposto alla superficie superiore della base
-            const baseBumpTex = textureLoader.load('Base.png', (texture) => {
+            // 2. Disco dedicato con Normal Map Base.png 10x10
+            const baseNormalTex = textureLoader.load('Base.png', (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
                 texture.repeat.set(10, 10);
@@ -408,18 +408,18 @@
             const topDiscGeo = new THREE.CircleGeometry(platformRadius, 64);
             const topDiscMat = new THREE.MeshStandardMaterial({
                 color: 0x64748b,
-                roughness: 0.4,
+                roughness: 0.3,
                 metalness: 0.1,
-                bumpMap: baseBumpTex,
-                bumpScale: 3.35,
+                normalMap: baseNormalTex,
+                normalScale: new THREE.Vector2(2.0, 2.0), // Intensità rilievo normal map
                 polygonOffset: true,
                 polygonOffsetFactor: -1,
                 polygonOffsetUnits: -1
             });
 
             const topDiscMesh = new THREE.Mesh(topDiscGeo, topDiscMat);
-            topDiscMesh.rotation.x = -Math.PI / 2; // Ruotato in orizzontale
-            topDiscMesh.position.y = 0.001;        // Un pelo sopra la superficie della base
+            topDiscMesh.rotation.x = -Math.PI / 2;
+            topDiscMesh.position.y = 0.001; // Posizionato appena sopra la base
             topDiscMesh.receiveShadow = true;
             worldGroup.add(topDiscMesh);
 
