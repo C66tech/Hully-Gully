@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v5.2.0</title>
+    <title>Hully Gully WebXR Simulator v5.3.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v5.2.0
+                v5.3.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Cutoff 1100-1600 Hz & Casetta Cassa 2x2x3m</p>
+        <p class="text-xs text-slate-500 mb-4">Cutoff 500-1100 Hz, Pitch Ridotto & Cassa a Destra</p>
 
         <!-- Badge Audio -->
         <button id="btnAudio" class="w-full py-2 px-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
@@ -83,7 +83,7 @@
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
                 <span class="text-slate-600">Cutoff Filtro Motore</span>
-                <span id="valCutoff" class="text-emerald-600 font-mono font-bold">1100 Hz</span>
+                <span id="valCutoff" class="text-emerald-600 font-mono font-bold">500 Hz</span>
             </div>
         </div>
 
@@ -105,7 +105,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v5.2.0";
+        const GAME_VERSION = "v5.3.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
@@ -163,19 +163,19 @@
 
             oscMain = audioCtx.createOscillator();
             oscMain.type = 'sawtooth';
-            oscMain.frequency.setValueAtTime(40, audioCtx.currentTime);
+            oscMain.frequency.setValueAtTime(30, audioCtx.currentTime);
 
             oscSub = audioCtx.createOscillator();
             oscSub.type = 'square';
-            oscSub.frequency.setValueAtTime(20, audioCtx.currentTime);
+            oscSub.frequency.setValueAtTime(15, audioCtx.currentTime);
 
             motorFilter = audioCtx.createBiquadFilter();
             motorFilter.type = 'lowpass';
-            motorFilter.frequency.setValueAtTime(1100, audioCtx.currentTime);
+            motorFilter.frequency.setValueAtTime(500, audioCtx.currentTime);
             motorFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
 
             motorGain = audioCtx.createGain();
-            motorGain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            motorGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
 
             const subGain = audioCtx.createGain();
             subGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
@@ -372,7 +372,6 @@
             const roofMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.3, roughness: 0.5 });
             const windowMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7, roughness: 0.1 });
 
-            // 4 Piedini
             const legOffset = sizeXZ / 2 - legRadius * 1.5;
             const legPositions = [
                 [-legOffset, -legOffset],
@@ -388,27 +387,24 @@
                 boothGroup.add(leg);
             });
 
-            // Corpo Casetta (2m x 3m x 2m)
             const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(sizeXZ, bodyHeight, sizeXZ), bodyMat);
             bodyMesh.position.y = legHeight + bodyHeight / 2 - 0.6;
             bodyMesh.castShadow = true;
             bodyMesh.receiveShadow = true;
             boothGroup.add(bodyMesh);
 
-            // Tetto Piatto
             const roofThickness = 0.15;
             const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(sizeXZ + 0.3, roofThickness, sizeXZ + 0.3), roofMat);
             roofMesh.position.y = legHeight + bodyHeight + roofThickness / 2 - 0.6;
             roofMesh.castShadow = true;
             boothGroup.add(roofMesh);
 
-            // Finestra Cassa Frontale
             const windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.8), windowMat);
             windowMesh.position.set(0, legHeight + 1.8 - 0.6, sizeXZ / 2 + 0.01);
             boothGroup.add(windowMesh);
 
-            // Posizionamento Casetta sul lato sinistro della base
-            boothGroup.position.set(-13.0, 0, 2.0);
+            // Posizionata sul lato DESTRO della base
+            boothGroup.position.set(13.0, 0, 2.0);
 
             return boothGroup;
         }
@@ -506,7 +502,7 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Aggiunta Casetta della Cassa sulla Sinistra
+            // Aggiunta Casetta della Cassa sulla Destra
             const ticketBooth = createTicketBooth();
             worldGroup.add(ticketBooth);
 
@@ -979,24 +975,24 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // AGGIORNAMENTO DINAMICO AUDIO MOTORE
+            // AGGIORNAMENTO DINAMICO AUDIO MOTORE (v5.3.0)
             if (isAudioStarted && motorFilter && discPivotGroup) {
                 discPivotGroup.getWorldPosition(_pivotWorldPos);
                 
-                // Mappatura Z del perno: da -6.0 (posteriore/sfondo) a +6.0 (anteriore/fronte)
+                // Mappatura Z del perno: da -6.0 (dietro) a +6.0 (davanti)
                 const frontFactor = THREE.MathUtils.clamp((_pivotWorldPos.z + 6.0) / 12.0, 0.0, 1.0);
                 
-                // Cutoff del filtro Lowpass ristretto: da 1100 Hz (dietro) a 1600 Hz (davanti)
-                const targetCutoff = 1100 + Math.pow(frontFactor, 1.5) * 500;
+                // Cutoff filtro ridotto e ricalibrato: da 500 Hz a 1100 Hz
+                const targetCutoff = 500 + Math.pow(frontFactor, 1.5) * 600;
                 motorFilter.frequency.setTargetAtTime(targetCutoff, audioCtx.currentTime, 0.05);
 
-                // Modulazione frequenza oscillatori in base alla sola VELOCITÀ DISCO (vDiscoVal)
-                const baseFreq = 30 + vDiscoVal * 25;
+                // Pitch ridotto legato alla sola velocità del disco (vDiscoVal)
+                const baseFreq = 25 + vDiscoVal * 14;
                 oscMain.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.1);
                 oscSub.frequency.setTargetAtTime(baseFreq / 2.0, audioCtx.currentTime, 0.1);
 
                 // Modulazione Gain globale
-                const gainTarget = 0.03 + (vDiscoVal / MAX_SPEED) * 0.12;
+                const gainTarget = 0.04 + (vDiscoVal / MAX_SPEED) * 0.10;
                 motorGain.gain.setTargetAtTime(gainTarget, audioCtx.currentTime, 0.1);
 
                 const elCutoff = document.getElementById('valCutoff');
