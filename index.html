@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.9.0</title>
+    <title>Hully Gully WebXR Simulator v4.9.1</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.9.0
+                v4.9.1
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">BumpMap Base.png 10x10 & 4 Luci 5m</p>
+        <p class="text-xs text-slate-500 mb-4">Fix Proiezione UV BumpMap Base.png</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,10 +96,9 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.9.0";
+        const GAME_VERSION = "v4.9.1";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
-        // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340)
         const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
 
         let scene, camera, renderer, controls;
@@ -115,12 +114,10 @@
         let isNightMode = false;
         let raycaster = new THREE.Raycaster();
 
-        // Oggetti riutilizzabili per GC optimization
         const _carWorldPos = new THREE.Vector3();
         const _carWorldQuat = new THREE.Quaternion();
         const _rotOffset = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-        // Variabili Giostra
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
@@ -168,7 +165,6 @@
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            // Renderer WebXR
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -178,13 +174,11 @@
             renderer.xr.setReferenceSpaceType('local-floor');
             document.body.appendChild(renderer.domElement);
 
-            // OrbitControls per Desktop
             controls = new OrbitControls(camera, renderer.domElement);
             cameraRig.position.set(0, 3.0, 25);
             controls.target.set(0, 2.5, 0);
             controls.update();
 
-            // Eventi sessione VR/AR
             renderer.xr.addEventListener('sessionstart', () => {
                 controls.enabled = false;
                 cameraRig.position.set(0, 3.0, 25);
@@ -236,67 +230,56 @@
 
             let mesh;
 
-            // 1. Box
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, 0.000, 0.831);
             mesh.scale.set(1.000, 0.649, 0.132);
             mainGroup.add(mesh);
 
-            // 2. Box
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, 0.000, -0.796);
             mesh.scale.set(1.000, 0.649, 0.132);
             mainGroup.add(mesh);
 
-            // 3. Box ruotato
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
             mesh.position.set(0.432, 0.000, 0.061);
             mesh.rotation.set(0.000, 1.571, 0.000);
             mesh.scale.set(1.626, 0.649, 0.132);
             mainGroup.add(mesh);
 
-            // 4. Box blu
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x0606ff, roughness: 1, metalness: 0 }));
             mesh.position.set(0.122, -0.175, 0.000);
             mesh.scale.set(0.521, 0.278, 1.659);
             mainGroup.add(mesh);
 
-            // 5. Cylinder bianco
             mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2, 32), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }));
             mesh.position.set(-0.291, 0.164, 0.000);
             mesh.rotation.set(1.571, 0.000, 0.000);
             mesh.scale.set(1.000, 0.828, 1.000);
             mainGroup.add(mesh);
 
-            // 6. Box giallo
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, -0.119, 0.879);
             mesh.scale.set(0.775, 0.126, 0.078);
             mainGroup.add(mesh);
 
-            // 7. Box giallo
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, 0.120, 0.879);
             mesh.scale.set(0.775, 0.126, 0.078);
             mainGroup.add(mesh);
 
-            // 8. Box giallo
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, 0.120, -0.839);
             mesh.scale.set(0.775, 0.126, 0.078);
             mainGroup.add(mesh);
 
-            // 9. Sphere blu
             mesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 16), new THREE.MeshStandardMaterial({ color: 0x0080ff, roughness: 1, metalness: 0 }));
             mesh.position.set(0.426, 0.330, -0.798);
             mainGroup.add(mesh);
 
-            // 10. Sphere blu
             mesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 16), new THREE.MeshStandardMaterial({ color: 0x0080ff, roughness: 1, metalness: 0 }));
             mesh.position.set(0.426, 0.330, 0.835);
             mainGroup.add(mesh);
 
-            // 11. Box giallo
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
             mesh.position.set(0.000, -0.119, -0.839);
             mesh.scale.set(0.775, 0.126, 0.078);
@@ -312,7 +295,6 @@
             const cylinderHeight = 10.0;
             const textureLoader = new THREE.TextureLoader();
 
-            // Cilindro Guida Invisibile
             const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
             const transparentCylMat = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
@@ -324,7 +306,6 @@
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
             worldGroup.add(transparentCyl);
 
-            // Semicilindro Posteriore Sfondo.png
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
                     texture.colorSpace = THREE.SRGBColorSpace; 
@@ -352,7 +333,6 @@
             
             worldGroup.add(backCyl);
 
-            // 4 Luci Fari Anteriori a 5m
             const frontAngles = [-Math.PI / 3, -Math.PI / 9, Math.PI / 9, Math.PI / 3];
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 5.0;
@@ -407,19 +387,37 @@
             const baseBumpTex = textureLoader.load('Base.png', (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(6, 6);
+                texture.repeat.set(10, 10);
             }, undefined, () => {
                 console.warn('Base.png non trovato nella root.');
             });
 
-            // Piattaforma di Base con Bump Map applicata
+            // Piattaforma Cilindrica
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
+            
+            // Proiezione UV Cartesiana (Piano XY) sul disco superiore per evitare la distorsione radiale
+            const uvAttr = platformGeo.attributes.uv;
+            const posAttr = platformGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                const x = posAttr.getX(i);
+                const y = posAttr.getY(i);
+                const z = posAttr.getZ(i);
+
+                // Mappa il disco superiore in coordinate piatte 0.0 - 1.0
+                if (y > 0) {
+                    const u = (x / (platformRadius * 2)) + 0.5;
+                    const v = (z / (platformRadius * 2)) + 0.5;
+                    uvAttr.setXY(i, u, v);
+                }
+            }
+            uvAttr.needsUpdate = true;
+
             const platformMat = new THREE.MeshStandardMaterial({ 
-                color: 0x9090A0, 
+                color: 0x64748b, 
                 roughness: 0.4, 
-                metalness: 0.4,
+                metalness: 0.1,
                 bumpMap: baseBumpTex,
-                bumpScale: 10.0
+                bumpScale: 0.25 // Valore di rilievo marcato
             });
             
             const platform = new THREE.Mesh(platformGeo, platformMat);
@@ -461,7 +459,6 @@
             const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 });
             const discMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFF20, roughness: 0.5 });
 
-            // 1. Disco di Base
             const discBaseRadius = 6.0;
             const discBaseThickness = 0.2;
             const baseElevation = 0.25;
@@ -473,7 +470,6 @@
             baseDiscMesh.position.y = baseElevation + discBaseThickness / 2;
             discGroup.add(baseDiscMesh);
 
-            // 2. Cono Ristretto
             const coneRadius = 4.5;
             const coneHeight = 1.0;
 
@@ -484,7 +480,6 @@
             mainConeMesh.position.y = baseElevation + discBaseThickness + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // 3. Dodecaedro Verde in Punta
             const edgeLength = 0.40;
             const dodecahedronRadius = edgeLength * 0.71364;
             const dodecahedronGeo = new THREE.DodecahedronGeometry(dodecahedronRadius);
@@ -499,7 +494,6 @@
             dodecahedronMesh.position.set(0, coneApexY + dodecahedronRadius, 0);
             discGroup.add(dodecahedronMesh);
 
-            // Generazione 16 Carrozze e 16 Barre Inclinate
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
@@ -589,7 +583,6 @@
 
             hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 24px Arial'; hudCtx.fillText('HULLY GULLY VR', 28, 45);
 
-            // Disegno Pulsante Giorno / Notte
             hudCtx.fillStyle = isNightMode ? '#1e293b' : '#f59e0b';
             hudCtx.strokeStyle = isNightMode ? '#38bdf8' : '#d97706';
             hudCtx.lineWidth = 3;
