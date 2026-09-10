@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.3.0</title>
+    <title>Hully Gully WebXR Simulator v3.4.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.3.0
+                v3.4.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Nuova Mappatura: X/Y Scala, A Aggancio, B Carrozza</p>
+        <p class="text-xs text-slate-500 mb-4">Modello Carrozza Dettagliato & Controlli VR</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.3.0";
+        const GAME_VERSION = "v3.4.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -214,6 +214,85 @@
             renderer.setAnimationLoop(animate);
         }
 
+        // Funzione per creare la carrozza dettagliata basata sulle primitive fornite
+        function createDetailedCarriage() {
+            const mainGroup = new THREE.Group();
+            mainGroup.name = "carrozza";
+
+            let mesh;
+
+            // 1. Box
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, 0.000, 0.831);
+            mesh.scale.set(1.000, 0.649, 0.132);
+            mainGroup.add(mesh);
+
+            // 2. Box
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, 0.000, -0.796);
+            mesh.scale.set(1.000, 0.649, 0.132);
+            mainGroup.add(mesh);
+
+            // 3. Box ruotato
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.432, 0.000, 0.061);
+            mesh.rotation.set(0.000, 1.571, 0.000);
+            mesh.scale.set(1.626, 0.649, 0.132);
+            mainGroup.add(mesh);
+
+            // 4. Box nero
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.122, -0.175, 0.000);
+            mesh.scale.set(0.521, 0.278, 1.659);
+            mainGroup.add(mesh);
+
+            // 5. Cylinder bianco
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2, 32), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }));
+            mesh.position.set(-0.291, 0.164, 0.000);
+            mesh.rotation.set(1.571, 0.000, 0.000);
+            mesh.scale.set(1.000, 0.828, 1.000);
+            mainGroup.add(mesh);
+
+            // 6. Box giallo
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, -0.119, 0.879);
+            mesh.scale.set(0.775, 0.126, 0.078);
+            mainGroup.add(mesh);
+
+            // 7. Box giallo
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, 0.120, 0.879);
+            mesh.scale.set(0.775, 0.126, 0.078);
+            mainGroup.add(mesh);
+
+            // 8. Box giallo
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, 0.120, -0.839);
+            mesh.scale.set(0.775, 0.126, 0.078);
+            mainGroup.add(mesh);
+
+            // 9. Sphere blu
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 16), new THREE.MeshStandardMaterial({ color: 0x0080ff, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.426, 0.330, -0.798);
+            mainGroup.add(mesh);
+
+            // 10. Sphere blu
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 16), new THREE.MeshStandardMaterial({ color: 0x0080ff, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.426, 0.330, 0.835);
+            mainGroup.add(mesh);
+
+            // 11. Box giallo
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffff00, roughness: 1, metalness: 0 }));
+            mesh.position.set(0.000, -0.119, -0.839);
+            mesh.scale.set(0.775, 0.126, 0.078);
+            mainGroup.add(mesh);
+
+            // Scala di adattamento opzionale se necessario rispetto al layout esistente della giostra
+            mainGroup.scale.set(0.7, 0.7, 0.7);
+
+            return mainGroup;
+        }
+
         function createEnvironment() {
             const platformRadius = 11.0; // Diametro 22 metri
             const cylinderHeight = 10.0;
@@ -277,13 +356,12 @@
                 const spotLight = new THREE.SpotLight(0xffffff, 2.2, 45, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
                 
-                // 2 dirette al centro della piattaforma, 2 sul fondale posteriore
                 if (i < 2) {
                     spotLight.target.position.set(0, 1, 0);
                 } else {
                     spotLight.target.position.set(0, 3, -11);
                 }
-                spotLight.castShadow = false; // Ottimizzato per VR
+                spotLight.castShadow = false;
                 worldGroup.add(spotLight);
                 worldGroup.add(spotLight.target);
 
@@ -361,7 +439,7 @@
             centerCone.position.y = 0.9;
             discGroup.add(centerCone);
 
-            // Generazione 16 Carrozze e 16 Raggi
+            // Generazione 16 Carrozze Dettagliate
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
@@ -373,14 +451,11 @@
                 carGroup.position.set(Math.sin(angle) * carRadius, 0.3, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
-                const body = new THREE.Mesh(
-                    new THREE.BoxGeometry(1.0, 0.5, 1.8),
-                    new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? 0xf43f5e : 0x0ea5e9, roughness: 0.2 })
-                );
-                body.position.y = 0.4;
-                carGroup.add(body);
-                discGroup.add(carGroup);
+                // Inserimento della carrozza dettagliata definita dall'utente
+                const detailedCar = createDetailedCarriage();
+                carGroup.add(detailedCar);
 
+                discGroup.add(carGroup);
                 carriageGroups.push(carGroup);
 
                 const spokeAngle = angle + halfStepAngle;
@@ -488,7 +563,7 @@
             return -(Math.cos(Math.PI * x) - 1) / 2;
         }
 
-        // Elaborazione Input Controller XR (Mappatura aggiornata: X/Y Scala su sinistro, A Aggancio, B Carrozza su destro)
+        // Elaborazione Input Controller XR
         function processXRControllers(delta) {
             const session = renderer.xr.getSession();
             if (!session) return;
@@ -514,8 +589,8 @@
 
                     // Tasti X (-) e Y (+) sul controller sinistro per la scala del mondo (se non in vista carrozza)
                     if (!inCarView) {
-                        const btnX = buttons[4] && buttons[4].pressed; // X button
-                        const btnY = buttons[5] && buttons[5].pressed; // Y button
+                        const btnX = buttons[4] && buttons[4].pressed;
+                        const btnY = buttons[5] && buttons[5].pressed;
                         let currentScale = worldGroup.scale.x;
                         if (btnX) {
                             currentScale = Math.max(0.1, currentScale - scaleRate);
@@ -530,20 +605,20 @@
                 } else if (source.handedness === 'right') {
                     if (Math.abs(xAxis) > DEADZONE) {
                         vBaseVal = Math.max(0.0, Math.min(MAX_SPEED, vBaseVal + xAxis * speedRate));
-                        if (isLocked && !isTransitioning) vDiscoVal = vDiscoVal;
+                        if (isLocked && !isTransitioning) vDiscoVal = vBaseVal;
                     }
                     if (Math.abs(yAxis) > DEADZONE) {
                         angVal = Math.max(0.0, Math.min(22.0, angVal - yAxis * angleRate));
                     }
 
-                    // Tasto A sul controller destro (indice 4) -> Aggancio / Sgancio Velocità
+                    // Tasto A sul controller destro -> Aggancio / Sgancio Velocità
                     const btnA = buttons[4] && buttons[4].pressed;
                     if (btnA && !btnAPressedPrev) {
                         toggleLock();
                     }
                     btnAPressedPrev = btnA;
 
-                    // Tasto B sul controller destro (indice 5) -> Vista Carrozza / Direzione Moto
+                    // Tasto B sul controller destro -> Vista Carrozza / Direzione Moto
                     const btnB = buttons[5] && buttons[5].pressed;
                     if (btnB && !btnBPressedPrev) {
                         inCarView = !inCarView;
@@ -554,7 +629,6 @@
                     }
                     btnBPressedPrev = btnB;
 
-                    // Grilletto destro (indice 0) -> Teletrasporto
                     const trigger = buttons[0] && buttons[0].pressed;
                     const controller = controllers[1];
 
