@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.5.0</title>
+    <title>Hully Gully WebXR Simulator v4.5.1</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.5.0
+                v4.5.1
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Pulsante Giorno/Notte integrato nell'HUD VR</p>
+        <p class="text-xs text-slate-500 mb-4">Fix Inizializzazione Variabile HUD Bounds</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,8 +96,11 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.5.0";
+        const GAME_VERSION = "v4.5.1";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
+
+        // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340) - Spostata in alto per evitare ReferenceError
+        const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
 
         let scene, camera, renderer, controls;
         let cameraRig, worldGroup;
@@ -554,9 +557,6 @@
             updateHudTexture();
         }
 
-        // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340)
-        const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
-
         function updateHudTexture() {
             if (!hudCtx) return;
             hudCtx.fillStyle = '#0f1a0f'; hudCtx.fillRect(0, 0, 600, 340);
@@ -739,7 +739,6 @@
                         
                         raycaster.set(rayOrigin, rayDir);
 
-                        // Intercettazione del Grilletto sul Pulsante dell'HUD
                         if (trigger && !triggerPressedPrev) {
                             const hudIntersects = raycaster.intersectObject(hudMesh);
                             if (hudIntersects.length > 0) {
@@ -747,7 +746,6 @@
                             }
                         }
 
-                        // Teletrasporto se non è stato cliccato l'HUD
                         const intersects = raycaster.intersectObjects(teleportTargets, false);
                         if (trigger) {
                             if (intersects.length > 0) {
@@ -817,7 +815,6 @@
 
             updateHudTexture();
 
-            // Animazione Hue a Scatti ogni 1 secondo
             const stepIndex = Math.floor(currentTime / 1000);
             for (let i = 0; i < animatedSpotLights.length; i++) {
                 const lightObj = animatedSpotLights[i];
