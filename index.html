@@ -240,7 +240,7 @@
             mainGroup.add(mesh);
 
             // 4. Box nero
-            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0 }));
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x0606ff, roughness: 1, metalness: 0 }));
             mesh.position.set(0.122, -0.175, 0.000);
             mesh.scale.set(0.521, 0.278, 1.659);
             mainGroup.add(mesh);
@@ -453,7 +453,7 @@
                 // Barre/Raggi adagiate lungo il cono
                 const spokeAngle = angle + halfStepAngle;
                 const spokePivotGroup = new THREE.Group();
-                spokePivotGroup.position.set(0, baseElevation + coneHeight, 0);
+                spokePivotGroup.position.set(0, baseElevation + coneHeight+0.2, 0);
                 spokePivotGroup.rotation.y = spokeAngle;
                 
                 const spoke = new THREE.Mesh(
