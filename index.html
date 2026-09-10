@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.1.0</title>
+    <title>Hully Gully WebXR Simulator v4.2.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.1.0
+                v4.2.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Dodecaedro Verde (40cm) in Punta al Cono</p>
+        <p class="text-xs text-slate-500 mb-4">Fix Trasparenza Alpha Sfondo & Sorting 3D</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.1.0";
+        const GAME_VERSION = "v4.2.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -292,9 +292,10 @@
         }
 
         function createEnvironment() {
-            const platformRadius = 10.0;
-            const cylinderHeight = 11.0;
+            const platformRadius = 11.0;
+            const cylinderHeight = 10.0;
 
+            // Cilindro Guida Invisibile
             const transparentCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 64, 1, true);
             const transparentCylMat = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
@@ -306,27 +307,35 @@
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
             worldGroup.add(transparentCyl);
 
+            // Semicilindro Posteriore Sfondo.png Ottimizzato per Alpha & Profondità
             const textureLoader = new THREE.TextureLoader();
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
                     texture.colorSpace = THREE.SRGBColorSpace; 
-                    texture.wrapS = THREE.RepeatWrapping;
-                    texture.repeat.x = -1;
-                    texture.offset.x = 1;
                 },
                 undefined,
                 () => { console.warn('Sfondo.png non trovato nella root.'); }
             );
 
             const backCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 32, 1, true, 0, Math.PI);
+            
+            // Materiale ottimizzato per evitare flickering e trasparenze errate
             const backCylMat = new THREE.MeshBasicMaterial({
                 map: sfondoTex,
-                side: THREE.DoubleSide,
-                transparent: true
+                transparent: true,
+                alphaTest: 0.05,       // Scarta pixel completamente trasparenti
+                depthWrite: false,      // Impedisce buchi nel buffer di profondità vicini
+                side: THREE.FrontSide   // Singola Faccia per evitare conflitti Z-Buffer
             });
+            
             const backCyl = new THREE.Mesh(backCylGeo, backCylMat);
             backCyl.position.y = cylinderHeight / 2 - 0.6;
             backCyl.rotation.y = Math.PI / 2;
+            
+            // Orientamento interno e priorità di rendering
+            backCyl.scale.x = -1;
+            backCyl.renderOrder = -1; // Disegnato per primo
+            
             worldGroup.add(backCyl);
 
             const frontAngles = [-Math.PI / 4, -Math.PI / 12, Math.PI / 12, Math.PI / 4];
@@ -441,9 +450,9 @@
             mainConeMesh.position.y = baseElevation + discBaseThickness + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // 3. Dodecaedro Verde in Punta al Cono (Lato 40cm -> Raggio circoscritto ~0.28m)
+            // 3. Dodecaedro Verde in Punta
             const edgeLength = 0.40;
-            const dodecahedronRadius = edgeLength * 0.71364; // Calcolo raggio da lunghezza lato
+            const dodecahedronRadius = edgeLength * 0.71364;
             const dodecahedronGeo = new THREE.DodecahedronGeometry(dodecahedronRadius);
             const dodecahedronMat = new THREE.MeshStandardMaterial({ 
                 color: 0x00ff44, 
@@ -452,12 +461,11 @@
             });
             const dodecahedronMesh = new THREE.Mesh(dodecahedronGeo, dodecahedronMat);
             
-            // Posizionato esattamente sulla cima del cono
             const coneApexY = baseElevation + discBaseThickness + coneHeight;
             dodecahedronMesh.position.set(0, coneApexY + dodecahedronRadius, 0);
             discGroup.add(dodecahedronMesh);
 
-            // Generazione 16 Carrozze e 16 Barre Inclinate adagiate sul cono ristretto
+            // Generazione 16 Carrozze e 16 Barre Inclinate
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
@@ -479,7 +487,6 @@
                 discGroup.add(carGroup);
                 carriageGroups.push(carGroup);
 
-                // Barre/Raggi adagiati lungo la superficie del cono
                 const spokeAngle = angle + halfStepAngle;
                 const spokePivotGroup = new THREE.Group();
                 spokePivotGroup.position.set(0, baseElevation + discBaseThickness + coneHeight, 0);
