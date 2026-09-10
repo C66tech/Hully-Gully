@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v5.3.0</title>
+    <title>Hully Gully WebXR Simulator v5.6.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,14 +52,14 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v5.3.0
+                v5.6.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Cutoff 500-1100 Hz, Pitch Ridotto & Cassa a Destra</p>
+        <p class="text-xs text-slate-500 mb-4">Disco Base e Piastra con Finitura ad Alta Metallicità</p>
 
         <!-- Badge Audio -->
         <button id="btnAudio" class="w-full py-2 px-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
-            <span>🔊 Clicca per Attivare Audio Motore</span>
+            <span>🔊 Clicca per Attivare Audio Motori</span>
         </button>
 
         <!-- Badge Stato / Countdown -->
@@ -82,7 +82,7 @@
                 <span id="valAng" class="text-amber-600 font-mono font-bold">0.0&deg;</span>
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Cutoff Filtro Motore</span>
+                <span class="text-slate-600">Cutoff Filtro Disco</span>
                 <span id="valCutoff" class="text-emerald-600 font-mono font-bold">500 Hz</span>
             </div>
         </div>
@@ -105,7 +105,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v5.3.0";
+        const GAME_VERSION = "v5.6.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
@@ -150,10 +150,11 @@
         let inCarView = false;
         const keysPressed = {};
 
-        // SINTETIZZATORE AUDIO WEB AUDIO API
+        // SINTETIZZATORE AUDIO DOPPIO MOTORE WEB AUDIO API
         let audioCtx = null;
-        let oscMain = null, oscSub = null;
-        let motorFilter = null, motorGain = null;
+        let oscDisc = null, oscDiscSub = null;
+        let oscArm = null;
+        let discFilter = null;
         let isAudioStarted = false;
 
         function initEngineAudio() {
@@ -161,39 +162,50 @@
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
-            oscMain = audioCtx.createOscillator();
-            oscMain.type = 'sawtooth';
-            oscMain.frequency.setValueAtTime(30, audioCtx.currentTime);
+            oscDisc = audioCtx.createOscillator();
+            oscDisc.type = 'sawtooth';
+            oscDisc.frequency.setValueAtTime(25, audioCtx.currentTime);
 
-            oscSub = audioCtx.createOscillator();
-            oscSub.type = 'square';
-            oscSub.frequency.setValueAtTime(15, audioCtx.currentTime);
+            oscDiscSub = audioCtx.createOscillator();
+            oscDiscSub.type = 'square';
+            oscDiscSub.frequency.setValueAtTime(12.5, audioCtx.currentTime);
 
-            motorFilter = audioCtx.createBiquadFilter();
-            motorFilter.type = 'lowpass';
-            motorFilter.frequency.setValueAtTime(500, audioCtx.currentTime);
-            motorFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
+            discFilter = audioCtx.createBiquadFilter();
+            discFilter.type = 'lowpass';
+            discFilter.frequency.setValueAtTime(500, audioCtx.currentTime);
+            discFilter.Q.setValueAtTime(2.5, audioCtx.currentTime);
 
-            motorGain = audioCtx.createGain();
-            motorGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            const discGain = audioCtx.createGain();
+            discGain.gain.setValueAtTime(0.08, audioCtx.currentTime);
 
             const subGain = audioCtx.createGain();
-            subGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+            subGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
 
-            oscMain.connect(motorFilter);
-            oscSub.connect(subGain);
-            subGain.connect(motorFilter);
-            motorFilter.connect(motorGain);
-            motorGain.connect(audioCtx.destination);
+            oscDisc.connect(discFilter);
+            oscDiscSub.connect(subGain);
+            subGain.connect(discFilter);
+            discFilter.connect(discGain);
+            discGain.connect(audioCtx.destination);
 
-            oscMain.start();
-            oscSub.start();
+            oscArm = audioCtx.createOscillator();
+            oscArm.type = 'triangle';
+            oscArm.frequency.setValueAtTime(30, audioCtx.currentTime);
+
+            const armGain = audioCtx.createGain();
+            armGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+
+            oscArm.connect(armGain);
+            armGain.connect(audioCtx.destination);
+
+            oscDisc.start();
+            oscDiscSub.start();
+            oscArm.start();
 
             isAudioStarted = true;
             const btnAudio = document.getElementById('btnAudio');
             if (btnAudio) {
                 btnAudio.className = "w-full py-2 px-3 mb-3 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2";
-                btnAudio.innerHTML = "<span>🔊 Audio Motore Attivo</span>";
+                btnAudio.innerHTML = "<span>🔊 2 Motori Attivi</span>";
             }
         }
 
@@ -403,10 +415,67 @@
             windowMesh.position.set(0, legHeight + 1.8 - 0.6, sizeXZ / 2 + 0.01);
             boothGroup.add(windowMesh);
 
-            // Posizionata sul lato DESTRO della base
             boothGroup.position.set(13.0, 0, 2.0);
 
             return boothGroup;
+        }
+
+        function createFrontFence(towerPositions) {
+            const fenceGroup = new THREE.Group();
+            fenceGroup.name = "steccato_frontale";
+
+            const metalMat = new THREE.MeshStandardMaterial({
+                color: 0x94a3b8,
+                metalness: 0.85,
+                roughness: 0.25
+            });
+
+            const fenceHeight = 1.1;
+            const railRadius = 0.035;
+            const picketRadius = 0.018;
+
+            for (let i = 0; i < towerPositions.length - 1; i++) {
+                const p1 = towerPositions[i];
+                const p2 = towerPositions[i + 1];
+
+                const startVec = new THREE.Vector3(p1.x, 0, p1.z);
+                const endVec = new THREE.Vector3(p2.x, 0, p2.z);
+
+                const distance = startVec.distanceTo(endVec);
+                const midPoint = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5);
+                const angleY = Math.atan2(endVec.x - startVec.x, endVec.z - startVec.z);
+
+                const sectionGroup = new THREE.Group();
+                sectionGroup.position.copy(midPoint);
+                sectionGroup.rotation.y = angleY;
+
+                const topRail = new THREE.Mesh(new THREE.CylinderGeometry(railRadius, railRadius, distance, 16), metalMat);
+                topRail.rotation.x = Math.PI / 2;
+                topRail.position.y = fenceHeight;
+                topRail.castShadow = true;
+                sectionGroup.add(topRail);
+
+                const bottomRail = new THREE.Mesh(new THREE.CylinderGeometry(railRadius, railRadius, distance, 16), metalMat);
+                bottomRail.rotation.x = Math.PI / 2;
+                bottomRail.position.y = 0.25;
+                bottomRail.castShadow = true;
+                sectionGroup.add(bottomRail);
+
+                const picketsCount = Math.floor(distance / 0.35);
+                const step = distance / (picketsCount + 1);
+
+                for (let j = 1; j <= picketsCount; j++) {
+                    const picketOffset = -distance / 2 + j * step;
+                    const picket = new THREE.Mesh(new THREE.CylinderGeometry(picketRadius, picketRadius, fenceHeight + 0.1, 12), metalMat);
+                    picket.position.set(0, (fenceHeight + 0.1) / 2, picketOffset);
+                    picket.castShadow = true;
+                    sectionGroup.add(picket);
+                }
+
+                fenceGroup.add(sectionGroup);
+            }
+
+            return fenceGroup;
         }
 
         function createEnvironment() {
@@ -455,20 +524,23 @@
             const frontAngles = [-Math.PI / 3, -Math.PI / 9, Math.PI / 9, Math.PI / 3];
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 5.0;
+            const lightTowerPositions = [];
 
             for (let i = 0; i < 4; i++) {
                 const angle = frontAngles[i];
                 const posX = Math.sin(angle) * lightTowerRadius;
                 const posZ = Math.cos(angle) * lightTowerRadius;
+                lightTowerPositions.push({ x: posX, z: posZ });
 
                 const towerGroup = new THREE.Group();
                 towerGroup.position.set(posX, 0, posZ);
 
                 const pole = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.03, 0.03, lightTowerHeight, 16),
+                    new THREE.CylinderGeometry(0.05, 0.05, lightTowerHeight, 16),
                     new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 })
                 );
                 pole.position.y = lightTowerHeight / 2;
+                pole.castShadow = true;
                 towerGroup.add(pole);
 
                 const spotLight = new THREE.SpotLight(0xffffff, 3.5, 45, Math.PI / 2.2, 0.4, 1);
@@ -489,6 +561,9 @@
                 });
             }
 
+            const frontFence = createFrontFence(lightTowerPositions);
+            worldGroup.add(frontFence);
+
             const groundGeo = new THREE.PlaneGeometry(100, 100);
             const groundMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
             const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -502,16 +577,15 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Aggiunta Casetta della Cassa sulla Destra
             const ticketBooth = createTicketBooth();
             worldGroup.add(ticketBooth);
 
-            // Piattaforma di Base
+            // Piattaforma di Base Metallizzata
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ 
-                color: 0x64748b, 
-                roughness: 0.6, 
-                metalness: 0.2
+                color: 0x94a3b8, 
+                roughness: 0.2, 
+                metalness: 0.85
             });
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
@@ -519,7 +593,7 @@
             worldGroup.add(platform);
             teleportTargets.push(platform);
 
-            // Disco Grafico Visivo con Tile 8x8
+            // Disco Grafico Visivo con Alta Metallicità
             const graphicBaseTex = textureLoader.load('Base.png', (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;
                 texture.wrapS = THREE.RepeatWrapping;
@@ -532,8 +606,8 @@
             const topDiscGeo = new THREE.CircleGeometry(platformRadius, 64);
             const topDiscMat = new THREE.MeshStandardMaterial({
                 map: graphicBaseTex,
-                roughness: 0.5,
-                metalness: 0.1,
+                roughness: 0.2,
+                metalness: 0.85,
                 polygonOffset: true,
                 polygonOffsetFactor: -1,
                 polygonOffsetUnits: -1
@@ -575,8 +649,9 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 });
-            const discMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFF20, roughness: 0.5 });
+            // Materiali Metallici per il Disco e il Cono centrale
+            const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.3, metalness: 0.7 });
+            const discMaterial = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, roughness: 0.25, metalness: 0.8 });
 
             const discBaseRadius = 6.0;
             const discBaseThickness = 0.2;
@@ -604,8 +679,8 @@
             const dodecahedronGeo = new THREE.DodecahedronGeometry(dodecahedronRadius);
             const dodecahedronMat = new THREE.MeshStandardMaterial({ 
                 color: 0x00ff44, 
-                roughness: 0.3, 
-                metalness: 0.1 
+                roughness: 0.2, 
+                metalness: 0.8 
             });
             const dodecahedronMesh = new THREE.Mesh(dodecahedronGeo, dodecahedronMat);
             
@@ -975,28 +1050,28 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // AGGIORNAMENTO DINAMICO AUDIO MOTORE (v5.3.0)
-            if (isAudioStarted && motorFilter && discPivotGroup) {
-                discPivotGroup.getWorldPosition(_pivotWorldPos);
-                
-                // Mappatura Z del perno: da -6.0 (dietro) a +6.0 (davanti)
-                const frontFactor = THREE.MathUtils.clamp((_pivotWorldPos.z + 6.0) / 12.0, 0.0, 1.0);
-                
-                // Cutoff filtro ridotto e ricalibrato: da 500 Hz a 1100 Hz
-                const targetCutoff = 500 + Math.pow(frontFactor, 1.5) * 600;
-                motorFilter.frequency.setTargetAtTime(targetCutoff, audioCtx.currentTime, 0.05);
+            // AGGIORNAMENTO AUDIO INDIPENDENTE
+            if (isAudioStarted) {
+                if (discFilter && discPivotGroup) {
+                    discPivotGroup.getWorldPosition(_pivotWorldPos);
+                    const frontFactor = THREE.MathUtils.clamp((_pivotWorldPos.z + 6.0) / 12.0, 0.0, 1.0);
+                    const targetCutoff = 500 + Math.pow(frontFactor, 1.5) * 600;
+                    discFilter.frequency.setTargetAtTime(targetCutoff, audioCtx.currentTime, 0.05);
 
-                // Pitch ridotto legato alla sola velocità del disco (vDiscoVal)
-                const baseFreq = 25 + vDiscoVal * 14;
-                oscMain.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.1);
-                oscSub.frequency.setTargetAtTime(baseFreq / 2.0, audioCtx.currentTime, 0.1);
+                    const elCutoff = document.getElementById('valCutoff');
+                    if (elCutoff) elCutoff.textContent = `${Math.round(targetCutoff)} Hz`;
+                }
 
-                // Modulazione Gain globale
-                const gainTarget = 0.04 + (vDiscoVal / MAX_SPEED) * 0.10;
-                motorGain.gain.setTargetAtTime(gainTarget, audioCtx.currentTime, 0.1);
+                if (oscDisc && oscDiscSub) {
+                    const discFreq = 25 + vDiscoVal * 14;
+                    oscDisc.frequency.setTargetAtTime(discFreq, audioCtx.currentTime, 0.1);
+                    oscDiscSub.frequency.setTargetAtTime(discFreq / 2.0, audioCtx.currentTime, 0.1);
+                }
 
-                const elCutoff = document.getElementById('valCutoff');
-                if (elCutoff) elCutoff.textContent = `${Math.round(targetCutoff)} Hz`;
+                if (oscArm) {
+                    const armFreq = 28 + vBaseVal * 16;
+                    oscArm.frequency.setTargetAtTime(armFreq, audioCtx.currentTime, 0.1);
+                }
             }
 
             if (inCarView && carriageGroups.length > 0) {
