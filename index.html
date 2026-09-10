@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.6.0</title>
+    <title>Hully Gully WebXR Simulator v3.8.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.6.0
+                v3.8.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Cono H2m Diametro 12m & Barre Inclinate</p>
+        <p class="text-xs text-slate-500 mb-4">Ancoraggio Carrozze a 0.9m & Base Cono Elevata</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.6.0";
+        const GAME_VERSION = "v3.8.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -415,23 +415,24 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            // Sostituzione Disco con Grande Cono (Diametro 12m, Raggio 6m, Altezza 2m)
+            // Grande Cono (Diametro 12m, Raggio 6m, Altezza 2m)
             const discRadius = 6.0;
             const coneHeight = 2.0;
+            const baseElevation = 0.40;
+
             const mainConeMesh = new THREE.Mesh(
                 new THREE.ConeGeometry(discRadius, coneHeight, 64),
                 new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 })
             );
-            mainConeMesh.position.y = coneHeight / 2; // Centro a 1m per poggiare la base a y = 0
+            mainConeMesh.position.y = baseElevation + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // Generazione 16 Carrozze e 16 Barre Inclinate sulla Superficie del Cono
+            // Generazione 16 Carrozze con Ancoraggio a y = 0.9m
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
 
-            // Inclinazione della generatrice del cono: theta = arctan(H / R)
-            const coneInclineAngle = Math.atan2(coneHeight, discRadius); // rad
+            const coneInclineAngle = Math.atan2(coneHeight, discRadius);
             const spokeLength = Math.sqrt(discRadius * discRadius + coneHeight * coneHeight) - 0.6;
 
             for (let i = 0; i < numCars; i++) {
@@ -439,7 +440,7 @@
                 const carRadius = discRadius - 0.5;
                 const carGroup = new THREE.Group();
                 
-                // Posizionamento carrozze alla base esterna
+                // Ancoraggio carrozze fissato esattamente a y = 0.9m
                 carGroup.position.set(Math.sin(angle) * carRadius, 0.9, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
@@ -449,10 +450,10 @@
                 discGroup.add(carGroup);
                 carriageGroups.push(carGroup);
 
-                // Barre/Raggi adagiate lungo la superficie inclinata del cono
+                // Barre/Raggi adagiate lungo il cono
                 const spokeAngle = angle + halfStepAngle;
                 const spokePivotGroup = new THREE.Group();
-                spokePivotGroup.position.set(0, coneHeight, 0); // Ancoraggio sulla cima del cono
+                spokePivotGroup.position.set(0, baseElevation + coneHeight, 0);
                 spokePivotGroup.rotation.y = spokeAngle;
                 
                 const spoke = new THREE.Mesh(
@@ -460,7 +461,6 @@
                     new THREE.MeshBasicMaterial({ color: spokeColors[i % 3] })
                 );
                 
-                // Rotazione in Pitch per seguire la pendenza del cono
                 spoke.rotation.x = coneInclineAngle;
                 spoke.position.set(0, -coneHeight / 2, spokeLength / 2);
 
@@ -677,8 +677,8 @@
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
+            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
