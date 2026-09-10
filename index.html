@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.2.0</title>
+    <title>Hully Gully WebXR Simulator v4.5.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.2.0
+                v4.5.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Fix Trasparenza Alpha Sfondo & Sorting 3D</p>
+        <p class="text-xs text-slate-500 mb-4">Pulsante Giorno/Notte integrato nell'HUD VR</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -84,7 +84,7 @@
             <p>• <strong>Tasti X (-) e Y (+): Scala del Mondo (Sinistro)</strong></p>
             <p>• <strong>Tasto A: Aggancio / Sgancio Velocità (Destro)</strong></p>
             <p>• <strong>Tasto B: Vista Carrozza / Direzione Moto (Destro)</strong></p>
-            <p>• <strong>Grilletto DX: Teletrasporto sicuro</strong></p>
+            <p>• <strong>Grilletto DX: Teletrasporto / Clicca Pulsante HUD</strong></p>
         </div>
     </div>
 
@@ -96,18 +96,20 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.2.0";
+        const GAME_VERSION = "v4.5.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
         let cameraRig, worldGroup;
         let controllers = [], controllerGrips = [];
-        let hudGroup = null;
+        let hudGroup = null, hudMesh = null;
         let hudCanvas, hudCtx, hudTexture;
         let teleportRing;
         let teleportTargets = [];
         let carriageGroups = [];
         let animatedSpotLights = [];
+        let ambientLight, dirLight;
+        let isNightMode = false;
         let raycaster = new THREE.Raycaster();
 
         // Oggetti riutilizzabili per GC optimization
@@ -155,10 +157,10 @@
             camera.position.set(0, 0, 0);
             cameraRig.add(camera);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
             dirLight.position.set(10, 20, 10);
             dirLight.castShadow = true;
             scene.add(dirLight);
@@ -210,6 +212,9 @@
             window.addEventListener('keyup', (e) => {
                 keysPressed[e.key.toLowerCase()] = false;
             });
+
+            // Interazione Pointer Desktop per HUD
+            window.addEventListener('pointerdown', onPointerDown);
 
             renderer.setAnimationLoop(animate);
         }
@@ -307,42 +312,41 @@
             transparentCyl.position.y = cylinderHeight / 2 - 0.6;
             worldGroup.add(transparentCyl);
 
-            // Semicilindro Posteriore Sfondo.png Ottimizzato per Alpha & Profondità
+            // Semicilindro Posteriore Sfondo.png
             const textureLoader = new THREE.TextureLoader();
             const sfondoTex = textureLoader.load('Sfondo.png', 
                 (texture) => { 
                     texture.colorSpace = THREE.SRGBColorSpace; 
+                    texture.wrapS = THREE.RepeatWrapping;
+                    texture.repeat.x = -1;
+                    texture.offset.x = 1;
                 },
                 undefined,
                 () => { console.warn('Sfondo.png non trovato nella root.'); }
             );
 
             const backCylGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, cylinderHeight, 32, 1, true, 0, Math.PI);
-            
-            // Materiale ottimizzato per evitare flickering e trasparenze errate
             const backCylMat = new THREE.MeshBasicMaterial({
                 map: sfondoTex,
                 transparent: true,
-                alphaTest: 0.05,       // Scarta pixel completamente trasparenti
-                depthWrite: false,      // Impedisce buchi nel buffer di profondità vicini
-                side: THREE.FrontSide   // Singola Faccia per evitare conflitti Z-Buffer
+                alphaTest: 0.01,
+                side: THREE.BackSide,
+                depthWrite: false
             });
             
             const backCyl = new THREE.Mesh(backCylGeo, backCylMat);
             backCyl.position.y = cylinderHeight / 2 - 0.6;
             backCyl.rotation.y = Math.PI / 2;
-            
-            // Orientamento interno e priorità di rendering
-            backCyl.scale.x = -1;
-            backCyl.renderOrder = -1; // Disegnato per primo
+            backCyl.renderOrder = -1;
             
             worldGroup.add(backCyl);
 
-            const frontAngles = [-Math.PI / 4, -Math.PI / 12, Math.PI / 12, Math.PI / 4];
+            // 2 Luci Fari
+            const frontAngles = [-Math.PI / 6, Math.PI / 6];
             const lightTowerRadius = 11.0;
             const lightTowerHeight = 6.0;
 
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 2; i++) {
                 const angle = frontAngles[i];
                 const posX = Math.sin(angle) * lightTowerRadius;
                 const posZ = Math.cos(angle) * lightTowerRadius;
@@ -357,20 +361,22 @@
                 pole.position.y = lightTowerHeight / 2;
                 towerGroup.add(pole);
 
-                const spotLight = new THREE.SpotLight(0xffffff, 2.2, 45, Math.PI / 3, 0.4, 1);
+                const spotLight = new THREE.SpotLight(0xffffff, 3.5, 45, Math.PI / 3, 0.4, 1);
                 spotLight.position.set(posX, lightTowerHeight, posZ);
-                
-                if (i < 2) {
-                    spotLight.target.position.set(0, 1, 0);
-                } else {
-                    spotLight.target.position.set(0, 3, -11);
-                }
+                spotLight.target.position.set(0, 1, 0);
                 spotLight.castShadow = false;
+
+                const initialHue = (i === 0) ? 0.33 : 0.0;
+                spotLight.color.setHSL(initialHue, 1.0, 0.5);
+
                 worldGroup.add(spotLight);
                 worldGroup.add(spotLight.target);
-
                 worldGroup.add(towerGroup);
-                animatedSpotLights.push(spotLight);
+
+                animatedSpotLights.push({
+                    light: spotLight,
+                    initialHue: initialHue
+                });
             }
 
             const groundGeo = new THREE.PlaneGeometry(100, 100);
@@ -540,20 +546,38 @@
             hudCtx = hudCanvas.getContext('2d');
             hudTexture = new THREE.CanvasTexture(hudCanvas);
 
-            const panelMesh = new THREE.Mesh(
+            hudMesh = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.45, 0.25),
                 new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, side: THREE.DoubleSide })
             );
-            hudGroup.add(panelMesh);
+            hudGroup.add(hudMesh);
             updateHudTexture();
         }
+
+        // Coordinate Rettangolo Pulsante nell'HUD Canvas (600x340)
+        const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
 
         function updateHudTexture() {
             if (!hudCtx) return;
             hudCtx.fillStyle = '#0f1a0f'; hudCtx.fillRect(0, 0, 600, 340);
             hudCtx.strokeStyle = '#00ff66'; hudCtx.lineWidth = 8; hudCtx.strokeRect(4, 4, 592, 332);
 
-            hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 26px Arial'; hudCtx.fillText('HULLY GULLY VR HUD', 28, 45);
+            hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 24px Arial'; hudCtx.fillText('HULLY GULLY VR', 28, 45);
+
+            // Disegno Pulsante Giorno / Notte
+            hudCtx.fillStyle = isNightMode ? '#1e293b' : '#f59e0b';
+            hudCtx.strokeStyle = isNightMode ? '#38bdf8' : '#d97706';
+            hudCtx.lineWidth = 3;
+            hudCtx.beginPath();
+            hudCtx.roundRect(dayNightBtnBounds.x, dayNightBtnBounds.y, dayNightBtnBounds.w, dayNightBtnBounds.h, 10);
+            hudCtx.fill();
+            hudCtx.stroke();
+
+            hudCtx.fillStyle = '#ffffff';
+            hudCtx.font = 'bold 16px Arial';
+            hudCtx.textAlign = 'center';
+            hudCtx.fillText(isNightMode ? '🌙 NOTTE' : '☀️ GIORNO', dayNightBtnBounds.x + dayNightBtnBounds.w / 2, dayNightBtnBounds.y + 28);
+            hudCtx.textAlign = 'left';
 
             hudCtx.fillStyle = '#ffffff'; hudCtx.font = 'bold 22px Arial';
             hudCtx.fillText('Velocità BASE: ' + vBaseVal.toFixed(2), 28, 110);
@@ -564,6 +588,48 @@
             hudCtx.fillText('Stato: ' + (isLocked ? 'AGGANCIATO (1:1)' : 'SGANCIATO'), 28, 290);
 
             hudTexture.needsUpdate = true;
+        }
+
+        function toggleDayNight() {
+            isNightMode = !isNightMode;
+            if (isNightMode) {
+                ambientLight.intensity = 0.05;
+                dirLight.intensity = 0.1;
+                scene.background = new THREE.Color(0x020617);
+                scene.fog.color.setHex(0x020617);
+            } else {
+                ambientLight.intensity = 0.7;
+                dirLight.intensity = 0.6;
+                scene.background = new THREE.Color(0xe2e8f0);
+                scene.fog.color.setHex(0xe2e8f0);
+            }
+            updateHudTexture();
+        }
+
+        function checkHudClickUV(uv) {
+            if (!uv) return false;
+            const canvasX = uv.x * 600;
+            const canvasY = (1 - uv.y) * 340;
+
+            if (canvasX >= dayNightBtnBounds.x && canvasX <= dayNightBtnBounds.x + dayNightBtnBounds.w &&
+                canvasY >= dayNightBtnBounds.y && canvasY <= dayNightBtnBounds.y + dayNightBtnBounds.h) {
+                toggleDayNight();
+                return true;
+            }
+            return false;
+        }
+
+        function onPointerDown(event) {
+            if (renderer.xr.isPresenting) return;
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(hudMesh);
+            if (intersects.length > 0) {
+                checkHudClickUV(intersects[0].uv);
+            }
         }
 
         function toggleLock() {
@@ -672,8 +738,17 @@
                         const rayDir = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
                         
                         raycaster.set(rayOrigin, rayDir);
-                        const intersects = raycaster.intersectObjects(teleportTargets, false);
 
+                        // Intercettazione del Grilletto sul Pulsante dell'HUD
+                        if (trigger && !triggerPressedPrev) {
+                            const hudIntersects = raycaster.intersectObject(hudMesh);
+                            if (hudIntersects.length > 0) {
+                                checkHudClickUV(hudIntersects[0].uv);
+                            }
+                        }
+
+                        // Teletrasporto se non è stato cliccato l'HUD
+                        const intersects = raycaster.intersectObjects(teleportTargets, false);
                         if (trigger) {
                             if (intersects.length > 0) {
                                 targetPoint = intersects[0].point;
@@ -713,8 +788,8 @@
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
+            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
@@ -742,10 +817,12 @@
 
             updateHudTexture();
 
-            const timeSec = currentTime * 0.0003;
+            // Animazione Hue a Scatti ogni 1 secondo
+            const stepIndex = Math.floor(currentTime / 1000);
             for (let i = 0; i < animatedSpotLights.length; i++) {
-                const hue = (timeSec + (i / animatedSpotLights.length)) % 1.0;
-                animatedSpotLights[i].color.setHSL(hue, 1.0, 0.6);
+                const lightObj = animatedSpotLights[i];
+                const currentHue = (lightObj.initialHue + (stepIndex * 0.2)) % 1.0;
+                lightObj.light.color.setHSL(currentHue, 1.0, 0.5);
             }
 
             const SPEED_MULTIPLIER = 20.0;
