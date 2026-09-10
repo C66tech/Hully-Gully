@@ -440,8 +440,8 @@
                 const carRadius = discRadius - 0.8;
                 const carGroup = new THREE.Group();
                 
-                // Ancoraggio carrozze fissato esattamente a y = 0.6m
-                carGroup.position.set(Math.sin(angle) * carRadius, 0.6, Math.cos(angle) * carRadius);
+                // Ancoraggio carrozze fissato esattamente a y = 0.65m
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.65, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
                 const detailedCar = createDetailedCarriage();
