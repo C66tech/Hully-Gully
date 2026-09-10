@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v4.9.1</title>
+    <title>Hully Gully WebXR Simulator v4.9.2</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v4.9.1
+                v4.9.2
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Fix Proiezione UV BumpMap Base.png</p>
+        <p class="text-xs text-slate-500 mb-4">Disco BumpMap Base.png 10x10 Sovrapposto</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v4.9.1";
+        const GAME_VERSION = "v4.9.2";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
@@ -383,7 +383,20 @@
             grid.position.y = -0.61;
             worldGroup.add(grid);
 
-            // Caricamento Bump Map Base.png con ripetizione 10x10
+            // 1. Piattaforma Cilindrica di Base (Standard)
+            const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
+            const platformMat = new THREE.MeshStandardMaterial({ 
+                color: 0x64748b, 
+                roughness: 0.6, 
+                metalness: 0.2
+            });
+            const platform = new THREE.Mesh(platformGeo, platformMat);
+            platform.position.y = -0.3;
+            platform.receiveShadow = true;
+            worldGroup.add(platform);
+            teleportTargets.push(platform);
+
+            // 2. Disco dedicato con Bump Map 10x10 sovrapposto alla superficie superiore della base
             const baseBumpTex = textureLoader.load('Base.png', (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
@@ -392,39 +405,23 @@
                 console.warn('Base.png non trovato nella root.');
             });
 
-            // Piattaforma Cilindrica
-            const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
-            
-            // Proiezione UV Cartesiana (Piano XY) sul disco superiore per evitare la distorsione radiale
-            const uvAttr = platformGeo.attributes.uv;
-            const posAttr = platformGeo.attributes.position;
-            for (let i = 0; i < posAttr.count; i++) {
-                const x = posAttr.getX(i);
-                const y = posAttr.getY(i);
-                const z = posAttr.getZ(i);
-
-                // Mappa il disco superiore in coordinate piatte 0.0 - 1.0
-                if (y > 0) {
-                    const u = (x / (platformRadius * 2)) + 0.5;
-                    const v = (z / (platformRadius * 2)) + 0.5;
-                    uvAttr.setXY(i, u, v);
-                }
-            }
-            uvAttr.needsUpdate = true;
-
-            const platformMat = new THREE.MeshStandardMaterial({ 
-                color: 0x64748b, 
-                roughness: 0.4, 
+            const topDiscGeo = new THREE.CircleGeometry(platformRadius, 64);
+            const topDiscMat = new THREE.MeshStandardMaterial({
+                color: 0x64748b,
+                roughness: 0.4,
                 metalness: 0.1,
                 bumpMap: baseBumpTex,
-                bumpScale: 0.25 // Valore di rilievo marcato
+                bumpScale: 0.35,
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -1
             });
-            
-            const platform = new THREE.Mesh(platformGeo, platformMat);
-            platform.position.y = -0.3;
-            platform.receiveShadow = true;
-            worldGroup.add(platform);
-            teleportTargets.push(platform);
+
+            const topDiscMesh = new THREE.Mesh(topDiscGeo, topDiscMat);
+            topDiscMesh.rotation.x = -Math.PI / 2; // Ruotato in orizzontale
+            topDiscMesh.position.y = 0.001;        // Un pelo sopra la superficie della base
+            topDiscMesh.receiveShadow = true;
+            worldGroup.add(topDiscMesh);
 
             const ringGeo = new THREE.RingGeometry(0.4, 0.6, 32);
             ringGeo.rotateX(-Math.PI / 2);
