@@ -54,7 +54,7 @@
                 v3.8.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Ancoraggio Carrozze a 0.9m & Base Cono Elevata</p>
+        <p class="text-xs text-slate-500 mb-4">Ancoraggio Carrozze a 0.6m & Base Cono Elevata</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -427,7 +427,7 @@
             mainConeMesh.position.y = baseElevation + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // Generazione 16 Carrozze con Ancoraggio a y = 0.9m
+            // Generazione 16 Carrozze con Ancoraggio a y = 0.6m
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
@@ -437,11 +437,11 @@
 
             for (let i = 0; i < numCars; i++) {
                 const angle = (i / numCars) * Math.PI * 2;
-                const carRadius = discRadius + 0.5;
+                const carRadius = discRadius + 0.05;
                 const carGroup = new THREE.Group();
                 
                 // Ancoraggio carrozze fissato esattamente a y = 0.9m
-                carGroup.position.set(Math.sin(angle) * carRadius, 0.9, Math.cos(angle) * carRadius);
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.6, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
                 const detailedCar = createDetailedCarriage();
