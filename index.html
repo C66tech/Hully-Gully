@@ -427,7 +427,7 @@
             mainConeMesh.position.y = baseElevation + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // Generazione 16 Carrozze con Ancoraggio a y = 0.7m
+            // Generazione 16 Carrozze
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
@@ -437,11 +437,11 @@
 
             for (let i = 0; i < numCars; i++) {
                 const angle = (i / numCars) * Math.PI * 2;
-                const carRadius = discRadius - 0.4;
+                const carRadius = discRadius - 0.6;
                 const carGroup = new THREE.Group();
                 
-                // Ancoraggio carrozze fissato esattamente a y = 0.7m
-                carGroup.position.set(Math.sin(angle) * carRadius, 0.7, Math.cos(angle) * carRadius);
+                // Ancoraggio carrozze fissato esattamente a y = 0.8m
+                carGroup.position.set(Math.sin(angle) * carRadius, 0.8, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
                 const detailedCar = createDetailedCarriage();
