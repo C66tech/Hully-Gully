@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v3.9.0</title>
+    <title>Hully Gully WebXR Simulator v4.0.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,10 +51,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v3.9.0
+                v4.0.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Ancoraggio Carrozze a 0.6m & Base Cono Elevata</p>
+        <p class="text-xs text-slate-500 mb-4">Base Cono Ristretta (9m) & Disco Base (12m)</p>
 
         <!-- Badge Stato / Countdown -->
         <div id="badgeStatus" class="w-full py-2.5 px-4 mb-4 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl shadow-inner transition-all flex items-center justify-center space-x-2 border border-slate-300">
@@ -96,7 +96,7 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v3.9.0";
+        const GAME_VERSION = "v4.0.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
         let scene, camera, renderer, controls;
@@ -239,7 +239,7 @@
             mesh.scale.set(1.626, 0.649, 0.132);
             mainGroup.add(mesh);
 
-            // 4. Box nero
+            // 4. Box blu (colore aggiornato)
             mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x0606ff, roughness: 1, metalness: 0 }));
             mesh.position.set(0.122, -0.175, 0.000);
             mesh.scale.set(0.521, 0.278, 1.659);
@@ -415,32 +415,46 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            // Grande Cono (Diametro 12m)
-            const discRadius = 6.0;
-            const coneHeight = 1.0;
+            // Materiale unificato Arancione
+            const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 });
+
+            // 1. Nuovo Disco di Base (Diametro 12m = Raggio 6m, Spessore 0.2m)
+            const discBaseRadius = 6.0;
+            const discBaseThickness = 0.2;
             const baseElevation = 0.40;
 
-            const mainConeMesh = new THREE.Mesh(
-                new THREE.ConeGeometry(discRadius, coneHeight, 64),
-                new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 })
+            const baseDiscMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(discBaseRadius, discBaseRadius, discBaseThickness, 64),
+                coneMaterial
             );
-            mainConeMesh.position.y = baseElevation + coneHeight / 2;
+            baseDiscMesh.position.y = baseElevation + discBaseThickness / 2;
+            discGroup.add(baseDiscMesh);
+
+            // 2. Cono Ristretto di 3m sulla Base (Diametro 9m = Raggio 4.5m, Altezza 1m)
+            const coneRadius = 4.5; // Stringi il diametro da 12m a 9m (raggio -1.5m)
+            const coneHeight = 1.0;
+
+            const mainConeMesh = new THREE.Mesh(
+                new THREE.ConeGeometry(coneRadius, coneHeight, 64),
+                coneMaterial
+            );
+            mainConeMesh.position.y = baseElevation + discBaseThickness + coneHeight / 2;
             discGroup.add(mainConeMesh);
 
-            // Generazione 16 Carrozze
+            // Generazione 16 Carrozze e 16 Barre Inclinate adagiate sul cono ristretto
             const numCars = 16;
             const spokeColors = [0x00f0ff, 0xff0077, 0xffcc00];
             const halfStepAngle = (Math.PI * 2 / numCars) / 2;
 
-            const coneInclineAngle = Math.atan2(coneHeight, discRadius);
-            const spokeLength = Math.sqrt(discRadius * discRadius + coneHeight * coneHeight) - 0.6;
+            const coneInclineAngle = Math.atan2(coneHeight, coneRadius);
+            const spokeLength = Math.sqrt(coneRadius * coneRadius + coneHeight * coneHeight) - 0.2;
 
             for (let i = 0; i < numCars; i++) {
                 const angle = (i / numCars) * Math.PI * 2;
-                const carRadius = discRadius - 0.8;
+                const carRadius = discBaseRadius - 0.8;
                 const carGroup = new THREE.Group();
                 
-                // Ancoraggio carrozze fissato esattamente a y = 0.65m
+                // Ancoraggio carrozze sul disco di base a y = 0.65m
                 carGroup.position.set(Math.sin(angle) * carRadius, 0.65, Math.cos(angle) * carRadius);
                 carGroup.rotation.y = angle;
 
@@ -450,10 +464,10 @@
                 discGroup.add(carGroup);
                 carriageGroups.push(carGroup);
 
-                // Barre/Raggi adagiate lungo il cono
+                // Barre/Raggi adagiati lungo la nuova superficie del cono ristretto
                 const spokeAngle = angle + halfStepAngle;
                 const spokePivotGroup = new THREE.Group();
-                spokePivotGroup.position.set(0, baseElevation + coneHeight+0.2, 0);
+                spokePivotGroup.position.set(0, baseElevation + discBaseThickness + coneHeight, 0);
                 spokePivotGroup.rotation.y = spokeAngle;
                 
                 const spoke = new THREE.Mesh(
@@ -677,8 +691,8 @@
 
             if (keysPressed['arrowleft']) { vBaseVal = Math.max(0.0, vBaseVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
             if (keysPressed['arrowright']) { vBaseVal = Math.min(MAX_SPEED, vBaseVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
-            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vDiscoVal = vBaseVal; }
+            if (keysPressed['z']) { vDiscoVal = Math.max(0.0, vDiscoVal - speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
+            if (keysPressed['x']) { vDiscoVal = Math.min(MAX_SPEED, vDiscoVal + speedStep); if (isLocked && !isTransitioning) vBaseVal = vDiscoVal; }
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
