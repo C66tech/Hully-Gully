@@ -415,11 +415,11 @@
             // Piattaforma di Base con Bump Map applicata
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ 
-                color: 0x64748b, 
+                color: 0x9090A0, 
                 roughness: 0.4, 
                 metalness: 0.4,
                 bumpMap: baseBumpTex,
-                bumpScale: 0.5
+                bumpScale: 4.5
             });
             
             const platform = new THREE.Mesh(platformGeo, platformMat);
