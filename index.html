@@ -407,7 +407,7 @@
             const baseBumpTex = textureLoader.load('Base.png', (texture) => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(10, 10);
+                texture.repeat.set(6, 6);
             }, undefined, () => {
                 console.warn('Base.png non trovato nella root.');
             });
@@ -419,7 +419,7 @@
                 roughness: 0.4, 
                 metalness: 0.4,
                 bumpMap: baseBumpTex,
-                bumpScale: 4.5
+                bumpScale: 10.0
             });
             
             const platform = new THREE.Mesh(platformGeo, platformMat);
