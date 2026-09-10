@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v5.6.0</title>
+    <title>Hully Gully WebXR Simulator v5.8.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,14 +52,14 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v5.6.0
+                v5.8.0
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Disco Base e Piastra con Finitura ad Alta Metallicità</p>
+        <p class="text-xs text-slate-500 mb-4">Pistone Idraulico, Controlli Volume HUD & Soundtrack</p>
 
         <!-- Badge Audio -->
         <button id="btnAudio" class="w-full py-2 px-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
-            <span>🔊 Clicca per Attivare Audio Motori</span>
+            <span>🔊 Clicca per Attivare Sistema Audio</span>
         </button>
 
         <!-- Badge Stato / Countdown -->
@@ -82,8 +82,8 @@
                 <span id="valAng" class="text-amber-600 font-mono font-bold">0.0&deg;</span>
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Cutoff Filtro Disco</span>
-                <span id="valCutoff" class="text-emerald-600 font-mono font-bold">500 Hz</span>
+                <span class="text-slate-600">Pistone Idraulico</span>
+                <span id="valPiston" class="text-sky-600 font-mono font-bold">Inattivo</span>
             </div>
         </div>
 
@@ -91,9 +91,8 @@
             <p><strong>Mappatura Tastiera / VR:</strong></p>
             <p>• <kbd>Q</kbd>: Switch Giorno / Notte Blu Fioca</p>
             <p>• Stick SX (Oriz): VDISCO | Stick DX (Oriz): VBASE</p>
-            <p>• <strong>Tasti X (-) e Y (+): Scala del Mondo (Sinistro)</strong></p>
-            <p>• <strong>Tasto A: Aggancio / Sgancio Velocità (Destro)</strong></p>
-            <p>• <strong>Grilletto DX: Teletrasporto / Clicca Pulsante HUD</strong></p>
+            <p>• Stick DX (Vert): Angolo Braccio (Pistone)</p>
+            <p>• <strong>Grilletto DX: Teletrasporto / Tasti Volume HUD</strong></p>
         </div>
     </div>
 
@@ -105,10 +104,17 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v5.6.0";
+        const GAME_VERSION = "v5.8.0";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
-        const dayNightBtnBounds = { x: 410, y: 15, w: 165, h: 45 };
+        // Aree Interattive dell'HUD Canvas (600x420)
+        const hudButtons = {
+            dayNight: { x: 410, y: 15, w: 165, h: 45 },
+            sfxMinus: { x: 410, y: 310, w: 40, h: 35 },
+            sfxPlus:  { x: 535, y: 310, w: 40, h: 35 },
+            musMinus: { x: 410, y: 360, w: 40, h: 35 },
+            musPlus:  { x: 535, y: 360, w: 40, h: 35 }
+        };
 
         let scene, camera, renderer, controls;
         let cameraRig, worldGroup;
@@ -131,6 +137,7 @@
         let vBaseVal = 0.0;
         let vDiscoVal = 0.0;
         let angVal = 0.0;
+        let prevAngVal = 0.0;
         const MAX_SPEED = 5.0;
 
         let isLocked = false;
@@ -150,18 +157,45 @@
         let inCarView = false;
         const keysPressed = {};
 
-        // SINTETIZZATORE AUDIO DOPPIO MOTORE WEB AUDIO API
+        // SISTEMA AUDIO WEB AUDIO API (v5.8.0)
         let audioCtx = null;
-        let oscDisc = null, oscDiscSub = null;
-        let oscArm = null;
+        let oscDisc = null, oscDiscSub = null, oscArm = null;
         let discFilter = null;
+        
+        // Audio Pistone Idraulico (Noise)
+        let noiseNode = null, pistonFilter = null, pistonGain = null;
+        
+        // Nodi Guadagno Master & Soundtrack
+        let sfxMasterGain = null, musicMasterGain = null;
+        let sfxVolume = 0.8, musicVolume = 0.5;
+        let bgAudioElement = null;
         let isAudioStarted = false;
+
+        function createWhiteNoiseBuffer(ctx) {
+            const bufferSize = ctx.sampleRate * 2;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
 
         function initEngineAudio() {
             if (isAudioStarted) return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
+            // Bus Guadagno Principali
+            sfxMasterGain = audioCtx.createGain();
+            sfxMasterGain.gain.setValueAtTime(sfxVolume, audioCtx.currentTime);
+            sfxMasterGain.connect(audioCtx.destination);
+
+            musicMasterGain = audioCtx.createGain();
+            musicMasterGain.gain.setValueAtTime(musicVolume, audioCtx.currentTime);
+            musicMasterGain.connect(audioCtx.destination);
+
+            // --- 1. MOTORE DISCO (Filtro Dinamico) ---
             oscDisc = audioCtx.createOscillator();
             oscDisc.type = 'sawtooth';
             oscDisc.frequency.setValueAtTime(25, audioCtx.currentTime);
@@ -185,8 +219,9 @@
             oscDiscSub.connect(subGain);
             subGain.connect(discFilter);
             discFilter.connect(discGain);
-            discGain.connect(audioCtx.destination);
+            discGain.connect(sfxMasterGain);
 
+            // --- 2. MOTORE BRACCIO (Diretto) ---
             oscArm = audioCtx.createOscillator();
             oscArm.type = 'triangle';
             oscArm.frequency.setValueAtTime(30, audioCtx.currentTime);
@@ -195,17 +230,48 @@
             armGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
 
             oscArm.connect(armGain);
-            armGain.connect(audioCtx.destination);
+            armGain.connect(sfxMasterGain);
+
+            // --- 3. PISTONE IDRAULICO (Sbuffo d'Aria Noise) ---
+            noiseNode = audioCtx.createBufferSource();
+            noiseNode.buffer = createWhiteNoiseBuffer(audioCtx);
+            noiseNode.loop = true;
+
+            pistonFilter = audioCtx.createBiquadFilter();
+            pistonFilter.type = 'bandpass';
+            pistonFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
+            pistonFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+
+            pistonGain = audioCtx.createGain();
+            pistonGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+
+            noiseNode.connect(pistonFilter);
+            pistonFilter.connect(pistonGain);
+            pistonGain.connect(sfxMasterGain);
 
             oscDisc.start();
             oscDiscSub.start();
             oscArm.start();
+            noiseNode.start();
+
+            // --- 4. Sottofondo Soundtrack.mp3 ---
+            bgAudioElement = new Audio('soundtrack.mp3');
+            bgAudioElement.loop = true;
+            
+            const musicSource = audioCtx.createMediaElementSource(bgAudioElement);
+            musicSource.connect(musicMasterGain);
+
+            bgAudioElement.play().then(() => {
+                console.log("Soundtrack.mp3 in riproduzione.");
+            }).catch(err => {
+                console.info("soundtrack.mp3 non presente o bloccato. Sottofondo disattivato.");
+            });
 
             isAudioStarted = true;
             const btnAudio = document.getElementById('btnAudio');
             if (btnAudio) {
                 btnAudio.className = "w-full py-2 px-3 mb-3 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2";
-                btnAudio.innerHTML = "<span>🔊 2 Motori Attivi</span>";
+                btnAudio.innerHTML = "<span>🔊 Sistema Audio Attivo</span>";
             }
         }
 
@@ -580,12 +646,11 @@
             const ticketBooth = createTicketBooth();
             worldGroup.add(ticketBooth);
 
-            // Piattaforma di Base Metallizzata
             const platformGeo = new THREE.CylinderGeometry(platformRadius, platformRadius, 0.6, 64);
             const platformMat = new THREE.MeshStandardMaterial({ 
-                color: 0x94a3b8, 
-                roughness: 0.2, 
-                metalness: 0.85
+                color: 0x64748b, 
+                roughness: 0.6, 
+                metalness: 0.2
             });
             const platform = new THREE.Mesh(platformGeo, platformMat);
             platform.position.y = -0.3;
@@ -593,7 +658,6 @@
             worldGroup.add(platform);
             teleportTargets.push(platform);
 
-            // Disco Grafico Visivo con Alta Metallicità
             const graphicBaseTex = textureLoader.load('Base.png', (texture) => {
                 texture.colorSpace = THREE.SRGBColorSpace;
                 texture.wrapS = THREE.RepeatWrapping;
@@ -606,8 +670,8 @@
             const topDiscGeo = new THREE.CircleGeometry(platformRadius, 64);
             const topDiscMat = new THREE.MeshStandardMaterial({
                 map: graphicBaseTex,
-                roughness: 0.2,
-                metalness: 0.85,
+                roughness: 0.5,
+                metalness: 0.1,
                 polygonOffset: true,
                 polygonOffsetFactor: -1,
                 polygonOffsetUnits: -1
@@ -649,9 +713,8 @@
             discGroup = new THREE.Group();
             discPivotGroup.add(discGroup);
 
-            // Materiali Metallici per il Disco e il Cono centrale
-            const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.3, metalness: 0.7 });
-            const discMaterial = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, roughness: 0.25, metalness: 0.8 });
+            const coneMaterial = new THREE.MeshStandardMaterial({ color: 0xFF7518, roughness: 0.5 });
+            const discMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFF20, roughness: 0.5 });
 
             const discBaseRadius = 6.0;
             const discBaseThickness = 0.2;
@@ -679,8 +742,8 @@
             const dodecahedronGeo = new THREE.DodecahedronGeometry(dodecahedronRadius);
             const dodecahedronMat = new THREE.MeshStandardMaterial({ 
                 color: 0x00ff44, 
-                roughness: 0.2, 
-                metalness: 0.8 
+                roughness: 0.3, 
+                metalness: 0.1 
             });
             const dodecahedronMesh = new THREE.Mesh(dodecahedronGeo, dodecahedronMat);
             
@@ -758,46 +821,77 @@
             hudGroup = new THREE.Group();
             
             hudCanvas = document.createElement('canvas');
-            hudCanvas.width = 600; hudCanvas.height = 340;
+            hudCanvas.width = 600; hudCanvas.height = 420;
             hudCtx = hudCanvas.getContext('2d');
             hudTexture = new THREE.CanvasTexture(hudCanvas);
 
             hudMesh = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.45, 0.25),
+                new THREE.PlaneGeometry(0.45, 0.315),
                 new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true, side: THREE.DoubleSide })
             );
             hudGroup.add(hudMesh);
             updateHudTexture();
         }
 
+        function drawHudButton(ctx, btn, label, colorBg = '#334155') {
+            ctx.fillStyle = colorBg;
+            ctx.strokeStyle = '#00ff66';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 6);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, btn.x + btn.w / 2, btn.y + btn.h / 2 + 6);
+            ctx.textAlign = 'left';
+        }
+
         function updateHudTexture() {
             if (!hudCtx) return;
-            hudCtx.fillStyle = '#0f1a0f'; hudCtx.fillRect(0, 0, 600, 340);
-            hudCtx.strokeStyle = '#00ff66'; hudCtx.lineWidth = 8; hudCtx.strokeRect(4, 4, 592, 332);
+            hudCtx.fillStyle = '#0f1a0f'; hudCtx.fillRect(0, 0, 600, 420);
+            hudCtx.strokeStyle = '#00ff66'; hudCtx.lineWidth = 8; hudCtx.strokeRect(4, 4, 592, 412);
 
             hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 24px Arial'; hudCtx.fillText('HULLY GULLY VR', 28, 45);
 
+            // Pulsante Giorno/Notte
             hudCtx.fillStyle = isNightMode ? '#1e293b' : '#f59e0b';
             hudCtx.strokeStyle = isNightMode ? '#38bdf8' : '#d97706';
             hudCtx.lineWidth = 3;
             hudCtx.beginPath();
-            hudCtx.roundRect(dayNightBtnBounds.x, dayNightBtnBounds.y, dayNightBtnBounds.w, dayNightBtnBounds.h, 10);
+            hudCtx.roundRect(hudButtons.dayNight.x, hudButtons.dayNight.y, hudButtons.dayNight.w, hudButtons.dayNight.h, 10);
             hudCtx.fill();
             hudCtx.stroke();
 
             hudCtx.fillStyle = '#ffffff';
             hudCtx.font = 'bold 16px Arial';
             hudCtx.textAlign = 'center';
-            hudCtx.fillText(isNightMode ? '🌙 NOTTE' : '☀️ GIORNO', dayNightBtnBounds.x + dayNightBtnBounds.w / 2, dayNightBtnBounds.y + 28);
+            hudCtx.fillText(isNightMode ? '🌙 NOTTE' : '☀️ GIORNO', hudButtons.dayNight.x + hudButtons.dayNight.w / 2, hudButtons.dayNight.y + 28);
             hudCtx.textAlign = 'left';
 
-            hudCtx.fillStyle = '#ffffff'; hudCtx.font = 'bold 22px Arial';
-            hudCtx.fillText('Velocità BASE: ' + vBaseVal.toFixed(2), 28, 110);
-            hudCtx.fillText('Velocità DISCO: ' + vDiscoVal.toFixed(2), 28, 170);
-            hudCtx.fillText('Angolo BRACCIO: ' + angVal.toFixed(1) + '°', 28, 230);
+            hudCtx.fillStyle = '#ffffff'; hudCtx.font = 'bold 20px Arial';
+            hudCtx.fillText('Velocità BASE: ' + vBaseVal.toFixed(2), 28, 100);
+            hudCtx.fillText('Velocità DISCO: ' + vDiscoVal.toFixed(2), 28, 150);
+            hudCtx.fillText('Angolo BRACCIO: ' + angVal.toFixed(1) + '°', 28, 200);
 
             hudCtx.fillStyle = isLocked ? '#00ff66' : '#ff2a6d';
-            hudCtx.fillText('Stato: ' + (isLocked ? 'AGGANCIATO (1:1)' : 'SGANCIATO'), 28, 290);
+            hudCtx.fillText('Stato: ' + (isLocked ? 'AGGANCIATO (1:1)' : 'SGANCIATO'), 28, 250);
+
+            // Sezione Regolazione Volumi
+            hudCtx.strokeStyle = '#1e293b'; hudCtx.lineWidth = 2;
+            hudCtx.beginPath(); hudCtx.moveTo(28, 275); hudCtx.lineTo(572, 275); hudCtx.stroke();
+
+            hudCtx.fillStyle = '#38bdf8'; hudCtx.font = 'bold 18px Arial';
+            hudCtx.fillText('Volume SFX: ' + Math.round(sfxVolume * 100) + '%', 28, 332);
+            drawHudButton(hudCtx, hudButtons.sfxMinus, '-');
+            drawHudButton(hudCtx, hudButtons.sfxPlus, '+');
+
+            hudCtx.fillStyle = '#f43f5e'; hudCtx.font = 'bold 18px Arial';
+            hudCtx.fillText('Volume MUSICA: ' + Math.round(musicVolume * 100) + '%', 28, 382);
+            drawHudButton(hudCtx, hudButtons.musMinus, '-');
+            drawHudButton(hudCtx, hudButtons.musPlus, '+');
 
             hudTexture.needsUpdate = true;
         }
@@ -825,11 +919,36 @@
         function checkHudClickUV(uv) {
             if (!uv) return false;
             const canvasX = uv.x * 600;
-            const canvasY = (1 - uv.y) * 340;
+            const canvasY = (1 - uv.y) * 420;
 
-            if (canvasX >= dayNightBtnBounds.x && canvasX <= dayNightBtnBounds.x + dayNightBtnBounds.w &&
-                canvasY >= dayNightBtnBounds.y && canvasY <= dayNightBtnBounds.y + dayNightBtnBounds.h) {
+            const isInside = (btn) => canvasX >= btn.x && canvasX <= btn.x + btn.w && canvasY >= btn.y && canvasY <= btn.y + btn.h;
+
+            if (isInside(hudButtons.dayNight)) {
                 toggleDayNight();
+                return true;
+            }
+            if (isInside(hudButtons.sfxMinus)) {
+                sfxVolume = Math.max(0.0, sfxVolume - 0.1);
+                if (sfxMasterGain) sfxMasterGain.gain.setValueAtTime(sfxVolume, audioCtx.currentTime);
+                updateHudTexture();
+                return true;
+            }
+            if (isInside(hudButtons.sfxPlus)) {
+                sfxVolume = Math.min(1.0, sfxVolume + 0.1);
+                if (sfxMasterGain) sfxMasterGain.gain.setValueAtTime(sfxVolume, audioCtx.currentTime);
+                updateHudTexture();
+                return true;
+            }
+            if (isInside(hudButtons.musMinus)) {
+                musicVolume = Math.max(0.0, musicVolume - 0.1);
+                if (musicMasterGain) musicMasterGain.gain.setValueAtTime(musicVolume, audioCtx.currentTime);
+                updateHudTexture();
+                return true;
+            }
+            if (isInside(hudButtons.musPlus)) {
+                musicVolume = Math.min(1.0, musicVolume + 0.1);
+                if (musicMasterGain) musicMasterGain.gain.setValueAtTime(musicVolume, audioCtx.currentTime);
+                updateHudTexture();
                 return true;
             }
             return false;
@@ -1007,6 +1126,28 @@
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
+            // CALCOLO DEL MOVIMENTO DEL PISTONE IDRAULICO
+            const angDelta = Math.abs(angVal - prevAngVal) / delta; 
+            prevAngVal = angVal;
+
+            if (isAudioStarted && pistonGain && pistonFilter) {
+                if (angDelta > 0.1) {
+                    // Sbuffo attivo durante il movimento dell'angolo
+                    const gainTarget = Math.min(0.25, angDelta * 0.03);
+                    const cutoffTarget = 400 + Math.min(2000, angDelta * 120);
+                    pistonGain.gain.setTargetAtTime(gainTarget, audioCtx.currentTime, 0.05);
+                    pistonFilter.frequency.setTargetAtTime(cutoffTarget, audioCtx.currentTime, 0.05);
+
+                    const elPiston = document.getElementById('valPiston');
+                    if (elPiston) elPiston.textContent = 'Pressione d\'Aria...';
+                } else {
+                    // Rilascio Pressione
+                    pistonGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.1);
+                    const elPiston = document.getElementById('valPiston');
+                    if (elPiston) elPiston.textContent = 'A Riposo';
+                }
+            }
+
             if (isLocked && isTransitioning) {
                 const elapsedMs = currentTime - transitionStartTime;
                 const progress = Math.min(elapsedMs / TRANSITION_DURATION, 1.0);
@@ -1050,16 +1191,13 @@
             if (armPivotGroup) armPivotGroup.rotation.z = -angRad;
             if (discGroup) discGroup.rotation.y = -THREE.MathUtils.degToRad(discAngleDeg);
 
-            // AGGIORNAMENTO AUDIO INDIPENDENTE
+            // AGGIORNAMENTO AUDIO MOTORI
             if (isAudioStarted) {
                 if (discFilter && discPivotGroup) {
                     discPivotGroup.getWorldPosition(_pivotWorldPos);
                     const frontFactor = THREE.MathUtils.clamp((_pivotWorldPos.z + 6.0) / 12.0, 0.0, 1.0);
                     const targetCutoff = 500 + Math.pow(frontFactor, 1.5) * 600;
                     discFilter.frequency.setTargetAtTime(targetCutoff, audioCtx.currentTime, 0.05);
-
-                    const elCutoff = document.getElementById('valCutoff');
-                    if (elCutoff) elCutoff.textContent = `${Math.round(targetCutoff)} Hz`;
                 }
 
                 if (oscDisc && oscDiscSub) {
