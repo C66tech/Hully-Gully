@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hully Gully WebXR Simulator v5.8.0</title>
+    <title>Hully Gully WebXR Simulator v5.8.1</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -52,10 +52,10 @@
                 HULLY GULLY WebXR
             </h1>
             <span class="bg-cyan-500/20 text-cyan-700 text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30">
-                v5.8.0
+                v5.8.1
             </span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Pistone Idraulico, Controlli Volume HUD & Soundtrack</p>
+        <p class="text-xs text-slate-500 mb-4">Volume Pistone al 60% rispetto ai Motori</p>
 
         <!-- Badge Audio -->
         <button id="btnAudio" class="w-full py-2 px-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
@@ -82,7 +82,7 @@
                 <span id="valAng" class="text-amber-600 font-mono font-bold">0.0&deg;</span>
             </div>
             <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg border border-slate-300">
-                <span class="text-slate-600">Pistone Idraulico</span>
+                <span class="text-slate-600">Pistone (Vol 60%)</span>
                 <span id="valPiston" class="text-sky-600 font-mono font-bold">Inattivo</span>
             </div>
         </div>
@@ -104,10 +104,9 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-        const GAME_VERSION = "v5.8.0";
+        const GAME_VERSION = "v5.8.1";
         console.log(`Hully Gully WebXR Simulator Version: ${GAME_VERSION}`);
 
-        // Aree Interattive dell'HUD Canvas (600x420)
         const hudButtons = {
             dayNight: { x: 410, y: 15, w: 165, h: 45 },
             sfxMinus: { x: 410, y: 310, w: 40, h: 35 },
@@ -157,15 +156,13 @@
         let inCarView = false;
         const keysPressed = {};
 
-        // SISTEMA AUDIO WEB AUDIO API (v5.8.0)
+        // SISTEMA AUDIO WEB AUDIO API
         let audioCtx = null;
         let oscDisc = null, oscDiscSub = null, oscArm = null;
         let discFilter = null;
         
-        // Audio Pistone Idraulico (Noise)
         let noiseNode = null, pistonFilter = null, pistonGain = null;
         
-        // Nodi Guadagno Master & Soundtrack
         let sfxMasterGain = null, musicMasterGain = null;
         let sfxVolume = 0.8, musicVolume = 0.5;
         let bgAudioElement = null;
@@ -186,7 +183,6 @@
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
-            // Bus Guadagno Principali
             sfxMasterGain = audioCtx.createGain();
             sfxMasterGain.gain.setValueAtTime(sfxVolume, audioCtx.currentTime);
             sfxMasterGain.connect(audioCtx.destination);
@@ -195,7 +191,7 @@
             musicMasterGain.gain.setValueAtTime(musicVolume, audioCtx.currentTime);
             musicMasterGain.connect(audioCtx.destination);
 
-            // --- 1. MOTORE DISCO (Filtro Dinamico) ---
+            // --- 1. MOTORE DISCO ---
             oscDisc = audioCtx.createOscillator();
             oscDisc.type = 'sawtooth';
             oscDisc.frequency.setValueAtTime(25, audioCtx.currentTime);
@@ -221,7 +217,7 @@
             discFilter.connect(discGain);
             discGain.connect(sfxMasterGain);
 
-            // --- 2. MOTORE BRACCIO (Diretto) ---
+            // --- 2. MOTORE BRACCIO ---
             oscArm = audioCtx.createOscillator();
             oscArm.type = 'triangle';
             oscArm.frequency.setValueAtTime(30, audioCtx.currentTime);
@@ -232,15 +228,15 @@
             oscArm.connect(armGain);
             armGain.connect(sfxMasterGain);
 
-            // --- 3. PISTONE IDRAULICO (Sbuffo d'Aria Noise) ---
+            // --- 3. PISTONE IDRAULICO (Guerra di Guadagno ricalibrata al 60%) ---
             noiseNode = audioCtx.createBufferSource();
             noiseNode.buffer = createWhiteNoiseBuffer(audioCtx);
             noiseNode.loop = true;
 
             pistonFilter = audioCtx.createBiquadFilter();
             pistonFilter.type = 'bandpass';
-            pistonFilter.frequency.setValueAtTime(800, audioCtx.currentTime);
-            pistonFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+            pistonFilter.frequency.setValueAtTime(750, audioCtx.currentTime);
+            pistonFilter.Q.setValueAtTime(1.0, audioCtx.currentTime);
 
             pistonGain = audioCtx.createGain();
             pistonGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
@@ -254,7 +250,7 @@
             oscArm.start();
             noiseNode.start();
 
-            // --- 4. Sottofondo Soundtrack.mp3 ---
+            // --- 4. Soundtrack.mp3 ---
             bgAudioElement = new Audio('soundtrack.mp3');
             bgAudioElement.loop = true;
             
@@ -856,7 +852,6 @@
 
             hudCtx.fillStyle = '#ffcc00'; hudCtx.font = 'bold 24px Arial'; hudCtx.fillText('HULLY GULLY VR', 28, 45);
 
-            // Pulsante Giorno/Notte
             hudCtx.fillStyle = isNightMode ? '#1e293b' : '#f59e0b';
             hudCtx.strokeStyle = isNightMode ? '#38bdf8' : '#d97706';
             hudCtx.lineWidth = 3;
@@ -879,7 +874,6 @@
             hudCtx.fillStyle = isLocked ? '#00ff66' : '#ff2a6d';
             hudCtx.fillText('Stato: ' + (isLocked ? 'AGGANCIATO (1:1)' : 'SGANCIATO'), 28, 250);
 
-            // Sezione Regolazione Volumi
             hudCtx.strokeStyle = '#1e293b'; hudCtx.lineWidth = 2;
             hudCtx.beginPath(); hudCtx.moveTo(28, 275); hudCtx.lineTo(572, 275); hudCtx.stroke();
 
@@ -1126,22 +1120,23 @@
             if (keysPressed['arrowup']) angVal = Math.min(22.0, angVal + angleStep);
             if (keysPressed['arrowdown']) angVal = Math.max(0.0, angVal - angleStep);
 
-            // CALCOLO DEL MOVIMENTO DEL PISTONE IDRAULICO
+            // CALCOLO PISTONE CON GUADAGNO AL 60% RISPETTO AI MOTORI
             const angDelta = Math.abs(angVal - prevAngVal) / delta; 
             prevAngVal = angVal;
 
             if (isAudioStarted && pistonGain && pistonFilter) {
                 if (angDelta > 0.1) {
-                    // Sbuffo attivo durante il movimento dell'angolo
-                    const gainTarget = Math.min(0.25, angDelta * 0.03);
-                    const cutoffTarget = 400 + Math.min(2000, angDelta * 120);
+                    // Limite del guadagno massimo impostato a 0.15 (60% rispetto al volume massimo dei due motori ~0.25 complessivi)
+                    const maxPistonGain = 0.15;
+                    const gainTarget = Math.min(maxPistonGain, angDelta * 0.02);
+                    const cutoffTarget = 400 + Math.min(1800, angDelta * 110);
+                    
                     pistonGain.gain.setTargetAtTime(gainTarget, audioCtx.currentTime, 0.05);
                     pistonFilter.frequency.setTargetAtTime(cutoffTarget, audioCtx.currentTime, 0.05);
 
                     const elPiston = document.getElementById('valPiston');
-                    if (elPiston) elPiston.textContent = 'Pressione d\'Aria...';
+                    if (elPiston) elPiston.textContent = 'Aria (60% Max)';
                 } else {
-                    // Rilascio Pressione
                     pistonGain.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.1);
                     const elPiston = document.getElementById('valPiston');
                     if (elPiston) elPiston.textContent = 'A Riposo';
